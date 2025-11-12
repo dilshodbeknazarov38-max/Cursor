@@ -1,1 +1,2 @@
-# Cursor
+// ai:
+Create a full-stack CPA management platform named "CPAMaRKeT.Uz" ...
