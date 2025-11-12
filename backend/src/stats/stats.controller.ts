@@ -1,4 +1,7 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
+
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 
 import { StatsService } from './stats.service';
 
@@ -12,7 +15,9 @@ export class StatsController {
   }
 
   @Get('dashboard/:role')
-  getDashboardStats(@Param('role') role: string) {
-    return this.statsService.getDashboardStats(role);
+  @UseGuards(JwtAuthGuard)
+  getDashboardStats(@Param('role') role: string, @Req() req: Request) {
+    const user = req.user as { sub?: string } | undefined;
+    return this.statsService.getDashboardStats(role, user?.sub ?? '');
   }
 }

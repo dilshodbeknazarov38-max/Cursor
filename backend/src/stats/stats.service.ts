@@ -1,10 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import {
+  OrderStatus,
+  PayoutStatus,
+  UserStatus,
+  type Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
 type TrendPoint = {
   label: string;
   value: number;
+};
+
+type DashboardContext = {
+  role: string;
+  userId: string;
+  leadWhere: Prisma.LeadWhereInput;
+  orderWhere: Prisma.OrderWhereInput;
+  payoutWhere: Prisma.PayoutWhereInput;
+  activityWhere: Prisma.ActivityLogWhereInput;
 };
 
 const MONTH_LABELS = [
@@ -22,186 +37,61 @@ const MONTH_LABELS = [
   'Dek',
 ];
 
-const WEEK_LABELS = ['Du', 'Se', 'Chor', 'Pay', 'Ju', 'Sha', 'Yak'];
-
-const ROLE_DEFAULTS: Record<
-  string,
-  {
-    metrics: { label: string; value: string; change?: string }[];
-    leadTrend: TrendPoint[];
-    salesTrend: TrendPoint[];
-    activeTrend: TrendPoint[];
-  }
-> = {
-  ADMIN: {
-    metrics: [
-      { label: 'Faol foydalanuvchilar', value: '1 284', change: '+8.6%' },
-      { label: 'Bugungi buyurtmalar', value: '342', change: '+4.2%' },
-      { label: 'Yangi bildirishnomalar', value: '27', change: '+5' },
-    ],
-    leadTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 400 + index * 32,
-    })),
-    salesTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 320 + index * 28,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 80 + index * 6,
-    })),
-  },
-  SUPER_ADMIN: {
-    metrics: [
-      { label: 'Kuzatishdagi foydalanuvchilar', value: '842', change: '+6.4%' },
-      { label: 'Hisobotlar', value: '58', change: '+3.1%' },
-      { label: 'Audit yozuvlari', value: '143', change: '+2' },
-    ],
-    leadTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 280 + index * 18,
-    })),
-    salesTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 240 + index * 16,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 62 + index * 4,
-    })),
-  },
-  OPER_ADMIN: {
-    metrics: [
-      { label: 'Faol operatorlar', value: '48', change: '+7.2%' },
-      { label: 'Yakunlangan buyurtmalar', value: '478', change: '+4.1%' },
-      { label: 'Kutayotgan buyurtmalar', value: '54', change: '-2.8%' },
-    ],
-    leadTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 60 + index * 5,
-    })),
-    salesTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 48 + index * 6,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 42 + index * 3,
-    })),
-  },
-  TARGET_ADMIN: {
-    metrics: [
-      { label: 'Faol targetologlar', value: '126', change: '+6.0%' },
-      { label: 'Bugungi lidlar', value: '892', change: '+6.4%' },
-      { label: 'Sifatli lidlar', value: '746', change: '+4.9%' },
-    ],
-    leadTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 320 + index * 30,
-    })),
-    salesTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 220 + index * 18,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 55 + index * 4,
-    })),
-  },
-  SELLER_ADMIN: {
-    metrics: [
-      { label: 'Faol sotuvchilar', value: '64', change: '+5.3%' },
-      { label: 'Kunlik savdo', value: '248 ta', change: '+7.1%' },
-      { label: 'O‘rtacha chek', value: '420 000 so‘m' },
-    ],
-    leadTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 180 + index * 12,
-    })),
-    salesTrend: MONTH_LABELS.map((label, index) => ({
-      label,
-      value: 260 + index * 14,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 68 + index * 4,
-    })),
-  },
-  SKLAD_ADMIN: {
-    metrics: [
-      { label: 'Ombordagi mahsulotlar', value: '18 240 dona' },
-      { label: 'Bugungi jo‘natishlar', value: '164 ta', change: '+3.1%' },
-      { label: 'Qaytarilgan buyurtmalar', value: '6 ta', change: '-1.4%' },
-    ],
-    leadTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 44 + index * 3,
-    })),
-    salesTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 52 + index * 5,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 33 + index * 2,
-    })),
-  },
-  TARGETOLOG: {
-    metrics: [
-      { label: 'Bugungi lidlar', value: '32 ta', change: '+5 ta' },
-      { label: 'Konversiya darajasi', value: '7.8%', change: '+0.9%' },
-      { label: 'Oylik to‘lov', value: '8 450 000 so‘m' },
-    ],
-    leadTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 28 + index * 3,
-    })),
-    salesTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 21 + index * 4,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 18 + index * 2,
-    })),
-  },
-  OPERATOR: {
-    metrics: [
-      { label: 'Bugungi buyurtmalar', value: '68 ta', change: '+6 ta' },
-      { label: 'Yakunlangan buyurtmalar', value: '52 ta', change: '+3 ta' },
-      { label: 'Qayta aloqa', value: '8 ta', change: '-2 ta' },
-    ],
-    leadTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 24 + index * 2,
-    })),
-    salesTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 18 + index * 3,
-    })),
-    activeTrend: WEEK_LABELS.map((label, index) => ({
-      label,
-      value: 14 + index * 2,
-    })),
-  },
-};
+const WEEK_LABELS = ['Yak', 'Du', 'Se', 'Chor', 'Pay', 'Ju', 'Sha'];
 
 @Injectable()
 export class StatsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getLandingStats() {
-    const totalUsers = await this.prisma.user.count();
-    const baseUsers = totalUsers || 1284;
+    const [
+      activeUsers,
+      totalLeads,
+      deliveredOrders,
+      topTargetologsRaw,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+      this.prisma.lead.count(),
+      this.prisma.order.count({
+        where: { status: OrderStatus.DELIVERED },
+      }),
+      this.prisma.order.groupBy({
+        by: ['targetologId'],
+        where: { status: OrderStatus.DELIVERED },
+        _count: { _all: true },
+        orderBy: {
+          _count: { _all: 'desc' },
+        },
+        take: 5,
+      }),
+    ]);
+
+    const targetologUsers =
+      topTargetologsRaw.length > 0
+        ? await this.prisma.user.findMany({
+            where: { id: { in: topTargetologsRaw.map((item) => item.targetologId) } },
+            select: { id: true, firstName: true, nickname: true },
+          })
+        : [];
+    const topTargetologs = topTargetologsRaw.map((record) => {
+      const user = targetologUsers.find((candidate) => candidate.id === record.targetologId);
+      return {
+        userId: record.targetologId,
+        fullName: user
+          ? `${user.firstName} (${user.nickname})`
+          : 'Noma’lum targetolog',
+        orders: Number(record._count?._all ?? 0),
+      };
+    });
 
     return {
       counts: {
-        users: baseUsers,
-        leads: baseUsers * 12,
-        sales: Math.round(baseUsers * 7.8),
-        topTargetologs: Math.max(12, Math.round(baseUsers / 60)),
+        users: activeUsers,
+        leads: totalLeads,
+        sales: deliveredOrders,
+        topTargetologs: topTargetologs.length,
       },
+      topTargetologs,
       testimonials: [
         {
           name: 'Gulnora X.',
@@ -213,7 +103,7 @@ export class StatsService {
           name: 'Murodjon A.',
           role: 'Targetolog',
           message:
-            'Leaddar statistikasi va tezkor to‘lovlar uchun eng qulay platforma. Yangi kampaniyalarni bir necha daqiqada ishga tushiraman.',
+            'Leadlar statistikasi va tezkor to‘lovlar uchun eng qulay platforma. Yangi kampaniyalarni bir necha daqiqada ishga tushiraman.',
         },
         {
           name: 'Sabina R.',
@@ -225,25 +115,361 @@ export class StatsService {
     };
   }
 
-  async getDashboardStats(roleSlug: string) {
-    const normalized = roleSlug.toUpperCase();
-    const defaults = ROLE_DEFAULTS[normalized] ?? ROLE_DEFAULTS.ADMIN;
+  async getDashboardStats(roleSlug: string, userId: string) {
+    const context = this.buildContext(roleSlug.toUpperCase(), userId);
 
-    const usersCount = await this.prisma.user.count();
+    const sixMonthsAgo = this.startOfMonth(this.addMonths(new Date(), -5));
+    const sevenDaysAgo = this.startOfDay(this.addDays(new Date(), -6));
+    const startOfToday = this.startOfDay(new Date());
+
+    const [
+      activeUsers,
+      totalLeads,
+      totalDeliveredOrders,
+      leadsToday,
+      ordersToday,
+      pendingPayouts,
+      deliveredRevenue,
+      approvedPayoutSum,
+      monthlyLeadsDates,
+      monthlyOrdersDates,
+      weeklyActivityDates,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+      this.prisma.lead.count({ where: context.leadWhere }),
+      this.prisma.order.count({
+        where: { ...context.orderWhere, status: OrderStatus.DELIVERED },
+      }),
+      this.prisma.lead.count({
+        where: {
+          ...context.leadWhere,
+          createdAt: { gte: startOfToday },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          ...context.orderWhere,
+          createdAt: { gte: startOfToday },
+        },
+      }),
+      this.prisma.payout.count({
+        where: {
+          ...context.payoutWhere,
+          status: PayoutStatus.PENDING,
+        },
+      }),
+      this.prisma.order.aggregate({
+        _sum: { amount: true },
+        where: {
+          ...context.orderWhere,
+          status: OrderStatus.DELIVERED,
+        },
+      }),
+      this.prisma.payout.aggregate({
+        _sum: { amount: true },
+        where: {
+          ...context.payoutWhere,
+          status: { in: [PayoutStatus.APPROVED, PayoutStatus.PAID] },
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: {
+          ...context.leadWhere,
+          createdAt: { gte: sixMonthsAgo },
+        },
+        select: { createdAt: true },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          ...context.orderWhere,
+          createdAt: { gte: sixMonthsAgo },
+        },
+        select: { createdAt: true },
+      }),
+      this.prisma.activityLog.findMany({
+        where: {
+          ...context.activityWhere,
+          createdAt: { gte: sevenDaysAgo },
+        },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const leadTrend = this.buildMonthlyTrend(
+      monthlyLeadsDates.map((record) => record.createdAt),
+    );
+    const salesTrend = this.buildMonthlyTrend(
+      monthlyOrdersDates.map((record) => record.createdAt),
+    );
+    const activeTrend = this.buildWeeklyTrend(
+      weeklyActivityDates.map((record) => record.createdAt),
+    );
+
+    const deliveredRevenueNumber = Number(
+      deliveredRevenue._sum.amount ?? 0,
+    );
+    const approvedPayoutNumber = Number(
+      approvedPayoutSum._sum.amount ?? 0,
+    );
+
+    const metrics = this.buildMetrics(context.role, {
+      leadsToday,
+      ordersToday,
+      pendingPayouts,
+      deliveredOrders: totalDeliveredOrders,
+      deliveredRevenue: deliveredRevenueNumber,
+      approvedPayouts: approvedPayoutNumber,
+    });
 
     return {
-      role: normalized,
-      metrics: defaults.metrics,
+      role: context.role,
+      metrics,
       charts: {
-        leads: defaults.leadTrend,
-        sales: defaults.salesTrend,
-        active: defaults.activeTrend,
+        leads: leadTrend,
+        sales: salesTrend,
+        active: activeTrend,
       },
       summary: {
-        users: usersCount,
-        leads: defaults.leadTrend.reduce((sum, point) => sum + point.value, 0),
-        sales: defaults.salesTrend.reduce((sum, point) => sum + point.value, 0),
+        users: activeUsers,
+        leads: totalLeads,
+        sales: totalDeliveredOrders,
       },
     };
+  }
+
+  private buildContext(role: string, userId: string): DashboardContext {
+    const leadWhere: Prisma.LeadWhereInput = {};
+    const orderWhere: Prisma.OrderWhereInput = {};
+    const payoutWhere: Prisma.PayoutWhereInput = {};
+    const activityWhere: Prisma.ActivityLogWhereInput = {};
+
+    const hasUser = Boolean(userId);
+
+    switch (role) {
+      case 'TARGETOLOG':
+        if (hasUser) {
+          leadWhere.targetologId = userId;
+          orderWhere.targetologId = userId;
+          payoutWhere.userId = userId;
+          activityWhere.userId = userId;
+        }
+        break;
+      case 'OPERATOR':
+        if (hasUser) {
+          orderWhere.operatorId = userId;
+          activityWhere.userId = userId;
+        }
+        break;
+      case 'SKLAD_ADMIN':
+        orderWhere.status = OrderStatus.IN_DELIVERY;
+        if (hasUser) {
+          activityWhere.userId = userId;
+        }
+        break;
+      default:
+        // Administrativ rollar umumiy ma’lumotlarni ko‘ra oladi.
+        break;
+    }
+
+    return {
+      role,
+      userId,
+      leadWhere,
+      orderWhere,
+      payoutWhere,
+      activityWhere,
+    };
+  }
+
+  private buildMetrics(
+    role: string,
+    data: {
+      leadsToday: number;
+      ordersToday: number;
+      pendingPayouts: number;
+      deliveredOrders: number;
+      deliveredRevenue: number;
+      approvedPayouts: number;
+    },
+  ) {
+    const formatNumber = (value: number) =>
+      value.toLocaleString('uz-UZ');
+    const formatCurrency = (value: number) =>
+      `${value.toLocaleString('uz-UZ')} so‘m`;
+
+    if (role === 'TARGETOLOG') {
+      return [
+        {
+          label: 'Bugungi leadlar',
+          value: `${formatNumber(data.leadsToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Kutilayotgan to‘lovlar',
+          value: `${formatNumber(data.pendingPayouts)} ta`,
+        },
+        {
+          label: 'Tasdiqlangan to‘lovlar',
+          value: formatCurrency(data.approvedPayouts),
+        },
+      ];
+    }
+
+    if (role === 'OPERATOR') {
+      return [
+        {
+          label: 'Bugungi buyurtmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Kutilayotgan qo‘ng‘iroqlar',
+          value: `${formatNumber(Math.max(data.pendingPayouts, 0))} ta`,
+        },
+        {
+          label: 'Yakunlangan savdolar',
+          value: formatCurrency(data.deliveredRevenue),
+        },
+      ];
+    }
+
+    if (role === 'SKLAD_ADMIN') {
+      return [
+        {
+          label: 'Yetkazilishi kerak',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Bugungi jo‘natmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Qabul qilish kutilmoqda',
+          value: `${formatNumber(data.pendingPayouts)} ta`,
+        },
+        {
+          label: 'Yetkazib berilgan savdolar',
+          value: formatCurrency(data.deliveredRevenue),
+        },
+      ];
+    }
+
+    return [
+      {
+        label: 'Bugungi leadlar',
+        value: `${formatNumber(data.leadsToday)} ta`,
+      },
+      {
+        label: 'Bugungi buyurtmalar',
+        value: `${formatNumber(data.ordersToday)} ta`,
+      },
+      {
+        label: 'Tasdiqlangan buyurtmalar',
+        value: `${formatNumber(data.deliveredOrders)} ta`,
+      },
+      {
+        label: 'Tasdiqlangan daromad',
+        value: formatCurrency(data.deliveredRevenue),
+      },
+    ];
+  }
+
+  private buildMonthlyTrend(dates: Date[]): TrendPoint[] {
+    const months = this.getMonthsRange(6);
+    const occurrences = this.countByMonth(dates);
+
+    return months.map((month) => {
+      const key = `${month.getFullYear()}-${month.getMonth()}`;
+      return {
+        label: MONTH_LABELS[month.getMonth()],
+        value: occurrences.get(key) ?? 0,
+      };
+    });
+  }
+
+  private buildWeeklyTrend(dates: Date[]): TrendPoint[] {
+    const days = this.getDaysRange(7);
+    const counts = this.countByDay(dates);
+
+    return days.map((day) => {
+      const key = this.formatDayKey(day);
+      return {
+        label: WEEK_LABELS[day.getDay()],
+        value: counts.get(key) ?? 0,
+      };
+    });
+  }
+
+  private countByMonth(dates: Date[]) {
+    const counts = new Map<string, number>();
+    for (const date of dates) {
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  private countByDay(dates: Date[]) {
+    const counts = new Map<string, number>();
+    for (const date of dates) {
+      const key = this.formatDayKey(date);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  private getMonthsRange(length: number) {
+    const months: Date[] = [];
+    const current = this.startOfMonth(new Date());
+    for (let index = length - 1; index >= 0; index -= 1) {
+      const month = this.startOfMonth(this.addMonths(current, -index));
+      months.push(month);
+    }
+    return months;
+  }
+
+  private getDaysRange(length: number) {
+    const days: Date[] = [];
+    const current = this.startOfDay(new Date());
+    for (let index = length - 1; index >= 0; index -= 1) {
+      const day = this.startOfDay(this.addDays(current, -index));
+      days.push(day);
+    }
+    return days;
+  }
+
+  private addMonths(date: Date, months: number) {
+    const result = new Date(date);
+    result.setMonth(result.getMonth() + months);
+    return result;
+  }
+
+  private addDays(date: Date, days: number) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  private startOfMonth(date: Date) {
+    const result = new Date(date);
+    result.setDate(1);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  private startOfDay(date: Date) {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  private formatDayKey(date: Date) {
+    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
   }
 }

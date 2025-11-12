@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { API_BASE_URL } from "@/lib/api";
 
 const resetSchema = z.object({
-  phone: z
+  telefon: z
     .string()
     .min(1, "Telefon raqamingizni kiriting.")
     .regex(/^\+998\d{9}$/, "Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak."),
@@ -40,7 +40,7 @@ export function ForgotPasswordForm() {
   const form = useForm<ResetFormValues>({
     resolver: zodResolver(resetSchema),
     defaultValues: {
-      phone: "+998",
+      telefon: "+998",
     },
   });
 
@@ -54,7 +54,7 @@ export function ForgotPasswordForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phone: values.phone,
+            telefon: values.telefon,
         }),
       });
 
@@ -71,7 +71,7 @@ export function ForgotPasswordForm() {
       setFeedback(
         "Tiklash havolasi telefon raqamingizga yuborildi. Havola 10 daqiqa davomida amal qiladi."
       );
-      form.reset({ phone: "+998" });
+        form.reset({ telefon: "+998" });
     } catch (fetchError) {
       console.error("Forgot password error", fetchError);
       setError("Serverga ulanib bo‘lmadi. Keyinroq urinib ko‘ring.");
@@ -97,7 +97,7 @@ export function ForgotPasswordForm() {
           >
             <FormField
               control={form.control}
-              name="phone"
+                name="telefon"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Telefon raqam</FormLabel>

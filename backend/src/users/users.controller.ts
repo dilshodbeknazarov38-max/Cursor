@@ -17,6 +17,7 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UsersService } from './users.service';
 
 type AuthenticatedRequest = Request & {
@@ -65,7 +66,28 @@ export class UsersController {
     return this.usersService.updateRole(
       id,
       dto.roleSlug.toUpperCase(),
-      req.user?.role ?? '',
+      {
+        userId: req.user?.sub ?? '',
+        role: req.user?.role ?? '',
+      },
+    );
+  }
+
+  @Patch(':id/status')
+  @Roles('ADMIN')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.updateStatus(
+      id,
+      dto.status,
+      {
+        userId: req.user?.sub ?? '',
+        role: req.user?.role ?? '',
+        reason: dto.reason,
+      },
     );
   }
 

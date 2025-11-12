@@ -4,9 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { NotificationType, Prisma, Role, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
+import { ActivityService } from '@/activity/activity.service';
+import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
@@ -18,7 +20,11 @@ export type SafeUser = Omit<UserWithRole, 'passwordHash'>;
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private ensureRoleExists(slug: string, name: string, description?: string) {
     return this.prisma.role.upsert({
@@ -61,6 +67,7 @@ export class UsersService {
         phone: payload.phone,
         passwordHash,
         roleId: role.id,
+        status: UserStatus.ACTIVE,
       },
       include: { role: true },
     });
@@ -110,6 +117,7 @@ export class UsersService {
         phone: payload.phone,
         passwordHash,
         roleId: role.id,
+        status: UserStatus.ACTIVE,
       },
       include: { role: true },
     });
@@ -162,9 +170,15 @@ export class UsersService {
   async updateRole(
     userId: string,
     roleSlug: string,
-    performedByRole: string,
+    performer: { userId: string; role: string },
   ): Promise<SafeUser> {
-    if (performedByRole !== 'ADMIN') {
+    if (!performer.userId) {
+      throw new ForbiddenException(
+        'Amalni bajarish uchun foydalanuvchi aniqlanmadi.',
+      );
+    }
+
+    if (performer.role !== 'ADMIN') {
       throw new ForbiddenException('Faqat Admin rolni o‘zgartirishi mumkin.');
     }
 
@@ -182,6 +196,24 @@ export class UsersService {
       include: { role: true },
     });
 
+    await this.activityService.log({
+      userId: performer.userId,
+      action: `Foydalanuvchi roli o‘zgartirildi: ${roleSlug}`,
+      meta: {
+        targetUserId: userId,
+        newRole: roleSlug,
+      },
+    });
+
+    await this.notificationsService.create({
+      toUserId: userId,
+      message: `Sizning rolingiz ${role.name} ga o‘zgartirildi.`,
+      type: NotificationType.USER,
+      metadata: {
+        newRole: roleSlug,
+      },
+    });
+
     return this.toSafeUser(user);
   }
 
@@ -194,6 +226,75 @@ export class UsersService {
 
     await this.prisma.user.delete({
       where: { id: userId },
+    });
+  }
+
+  async updateStatus(
+    userId: string,
+    status: UserStatus,
+    performedBy: { userId: string; role: string; reason?: string },
+  ): Promise<SafeUser> {
+    if (!performedBy.userId) {
+      throw new ForbiddenException(
+        'Amalni bajarish uchun foydalanuvchi aniqlanmadi.',
+      );
+    }
+
+    if (performedBy.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'Foydalanuvchi statusini o‘zgartirishga ruxsatingiz yo‘q.',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi.');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status,
+        blockedAt: status === UserStatus.BLOCKED ? new Date() : null,
+      },
+      include: { role: true },
+    });
+
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.activityService.log({
+      userId: performedBy.userId,
+      action: `Foydalanuvchi statusi yangilandi: ${status}`,
+      meta: {
+        targetUserId: userId,
+        status,
+        reason: performedBy.reason ?? null,
+      },
+    });
+
+    await this.notificationsService.create({
+      toUserId: userId,
+      message: `Sizning hisobingiz statusi: ${status}.`,
+      type: NotificationType.USER,
+      metadata: {
+        status,
+        reason: performedBy.reason ?? null,
+      },
+    });
+
+    return this.toSafeUser(updated);
+  }
+
+  async markLastLogin(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: new Date() },
     });
   }
 

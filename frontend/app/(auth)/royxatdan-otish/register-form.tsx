@@ -37,17 +37,17 @@ const registerSchema = z
       .string()
       .min(1, "Nickname kiriting.")
       .min(3, "Nickname kamida 3 ta belgi bo‘lishi kerak."),
-    phone: z
+    telefon: z
       .string()
       .min(1, "Telefon raqamingizni kiriting.")
       .regex(
         /^\+998\d{9}$/,
         "Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak."
       ),
-    password: z
+    parol: z
       .string()
       .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
-    confirmPassword: z
+    parolTasdiq: z
       .string()
       .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
     captcha: z
@@ -56,9 +56,9 @@ const registerSchema = z
         message: "Davom etish uchun “Men robot emasman” belgilang.",
     }),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((data) => data.parol === data.parolTasdiq, {
     message: "Parollar bir-biriga mos kelmadi.",
-    path: ["confirmPassword"],
+    path: ["parolTasdiq"],
   });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -73,9 +73,9 @@ export function RegisterForm() {
     defaultValues: {
       ism: "",
       nickname: "",
-      phone: "+998",
-      password: "",
-      confirmPassword: "",
+      telefon: "+998",
+      parol: "",
+      parolTasdiq: "",
       captcha: false,
     },
   });
@@ -90,10 +90,11 @@ export function RegisterForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          firstName: values.ism,
+          ism: values.ism,
           nickname: values.nickname,
-          phone: values.phone,
-          password: values.password,
+          telefon: values.telefon,
+          parol: values.parol,
+          parolTasdiq: values.parolTasdiq,
           captcha: values.captcha,
         }),
       });
@@ -112,9 +113,9 @@ export function RegisterForm() {
       form.reset({
         ism: "",
         nickname: "",
-        phone: "+998",
-        password: "",
-        confirmPassword: "",
+          telefon: "+998",
+          parol: "",
+          parolTasdiq: "",
         captcha: false,
       });
 
@@ -170,51 +171,51 @@ export function RegisterForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefon raqam</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="+998901234567"
-                      inputMode="tel"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid gap-6 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="password"
+                name="telefon"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Parol</FormLabel>
+                    <FormLabel>Telefon raqam</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="********" {...field} />
+                      <Input
+                        placeholder="+998901234567"
+                        inputMode="tel"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Parolni tasdiqlash</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="********" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="parol"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parol</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="********" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="parolTasdiq"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parolni tasdiqlash</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="********" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             <FormField
               control={form.control}
               name="captcha"
