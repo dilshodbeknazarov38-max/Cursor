@@ -26,16 +26,17 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { API_BASE_URL } from "@/lib/api";
+import { setSession } from "@/lib/session";
 
 const loginSchema = z.object({
-  phone: z
+  telefon: z
     .string()
     .min(1, "Telefon raqamingizni kiriting.")
     .regex(
       /^\+998\d{9}$/,
       "Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak."
     ),
-  password: z
+  parol: z
     .string()
     .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
   captcha: z
@@ -55,8 +56,8 @@ export function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      phone: "+998",
-      password: "",
+      telefon: "+998",
+      parol: "",
       captcha: false,
       rememberMe: false,
     },
@@ -71,16 +72,16 @@ export function LoginForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          phone: values.phone,
-          password: values.password,
+          telefon: values.telefon,
+          parol: values.parol,
           rememberMe: values.rememberMe,
           captcha: values.captcha,
         }),
         credentials: "include",
       });
 
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => null);
         const message =
           typeof errorBody?.message === "string"
             ? errorBody.message
@@ -89,7 +90,19 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/panel");
+        const data = await response.json();
+
+        const roleSlug = (data.user?.role?.slug ?? "TARGETOLOG").toLowerCase();
+
+        setSession({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          role: roleSlug.toUpperCase(),
+          userId: data.user?.id ?? "",
+          rememberMe: values.rememberMe,
+        });
+
+        router.push(`/dashboard/${roleSlug}`);
     } catch (error) {
       console.error("Login error", error);
       setServerError("Serverga ulanib bo‘lmadi. Keyinroq urinib ko‘ring.");
@@ -112,9 +125,9 @@ export function LoginForm() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-6 px-6 pb-6"
           >
-            <FormField
-              control={form.control}
-              name="phone"
+              <FormField
+                control={form.control}
+                name="telefon"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Telefon raqam</FormLabel>
@@ -129,9 +142,9 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="password"
+              <FormField
+                control={form.control}
+                name="parol"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Parol</FormLabel>

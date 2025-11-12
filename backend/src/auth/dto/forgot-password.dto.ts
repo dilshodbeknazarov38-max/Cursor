@@ -5,5 +5,5 @@ export class ForgotPasswordDto {
   @Matches(/^\+998\d{9}$/, {
     message: 'Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak.',
   })
-  phone!: string;
+  telefon!: string;
 }

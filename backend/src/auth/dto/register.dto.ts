@@ -1,10 +1,15 @@
-import { Matches, MinLength } from 'class-validator';
-import { IsBoolean, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsString()
   @IsNotEmpty({ message: 'Ismni kiriting.' })
-  firstName!: string;
+  ism!: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Nickname kiriting.' })
@@ -14,15 +19,15 @@ export class RegisterDto {
   @Matches(/^\+998\d{9}$/, {
     message: 'Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak.',
   })
-  phone!: string;
+  telefon!: string;
 
   @IsString()
   @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
-  password!: string;
+  parol!: string;
 
   @IsString()
   @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
-  confirmPassword!: string;
+  parolTasdiq!: string;
 
   @IsBoolean()
   captcha!: boolean;

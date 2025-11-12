@@ -1,4 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { UserStatus } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -96,9 +99,14 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   OPERATOR: ['HANDLE_ORDERS', 'VIEW_LEADS'],
 };
 
+const PASSWORD_SALT_ROUNDS = 10;
+
 @Injectable()
 export class AppService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async onModuleInit() {
     await this.seedAccessControl();
@@ -160,6 +168,62 @@ export class AppService implements OnModuleInit {
           });
         }
       }
+
+      await this.ensureDefaultAdmin(tx);
+    });
+  }
+
+  private async ensureDefaultAdmin(tx: PrismaService) {
+    const adminPhone = this.configService.get<string>('ADMIN_PHONE');
+    const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
+
+    if (!adminPhone || !adminPassword) {
+      return;
+    }
+
+    const adminName =
+      this.configService.get<string>('ADMIN_NAME') ?? 'Super Admin';
+    const adminNickname =
+      this.configService.get<string>('ADMIN_NICKNAME') ?? 'superadmin';
+
+    const adminRole = await tx.role.findUnique({
+      where: { slug: 'ADMIN' },
+    });
+
+    if (!adminRole) {
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(
+      adminPassword,
+      PASSWORD_SALT_ROUNDS,
+    );
+
+    const existing = await tx.user.findUnique({
+      where: { phone: adminPhone },
+    });
+
+    if (existing) {
+      await tx.user.update({
+        where: { id: existing.id },
+        data: {
+          passwordHash,
+          status: UserStatus.ACTIVE,
+          blockedAt: null,
+        },
+      });
+      return;
+    }
+
+    await tx.user.create({
+      data: {
+        firstName: adminName,
+        nickname: adminNickname,
+        phone: adminPhone,
+        passwordHash,
+        status: UserStatus.ACTIVE,
+        roleId: adminRole.id,
+      },
     });
   }
 }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -8,21 +9,29 @@ import { JwtService } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 import { createHash, randomBytes } from 'crypto';
 
+import { ActivityService } from '@/activity/activity.service';
 import { durationToSeconds } from '@/common/utils/duration.util';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SafeUser, UsersService } from '@/users/users.service';
 
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import type { JwtPayload } from './jwt.strategy';
+import { UserStatus } from '@prisma/client';
 
 type TokensResult = {
   accessToken: string;
   refreshToken: string;
   refreshTokenExpiresAt: Date;
+};
+
+type RequestContext = {
+  ip?: string;
+  userAgent?: string;
 };
 
 @Injectable()
@@ -32,26 +41,37 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly activityService: ActivityService,
   ) {}
 
-  async register(payload: RegisterDto) {
+  async register(payload: RegisterDto, context?: RequestContext) {
     if (!payload.captcha) {
       throw new BadRequestException(
         'Davom etish uchun “Men robot emasman” ni tasdiqlang.',
       );
     }
-    if (payload.password !== payload.confirmPassword) {
+    if (payload.parol !== payload.parolTasdiq) {
       throw new BadRequestException('Parollar mos kelmadi.');
     }
 
     const safeUser = await this.usersService.createTargetologist({
-      firstName: payload.firstName,
+      firstName: payload.ism,
       nickname: payload.nickname,
-      phone: payload.phone,
-      password: payload.password,
+      phone: payload.telefon,
+      password: payload.parol,
     });
 
     const tokens = await this.issueTokens(safeUser, false);
+
+    await this.activityService.log({
+      userId: safeUser.id,
+      action: 'Foydalanuvchi ro‘yxatdan o‘tdi.',
+      ip: context?.ip,
+      device: context?.userAgent,
+      meta: {
+        phone: safeUser.phone,
+      },
+    });
 
     return {
       message: 'Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi.',
@@ -60,21 +80,33 @@ export class AuthService {
     };
   }
 
-  async login(payload: LoginDto) {
+  async login(payload: LoginDto, context?: RequestContext) {
     if (!payload.captcha) {
       throw new BadRequestException(
         'Davom etish uchun “Men robot emasman” ni tasdiqlang.',
       );
     }
 
-    const user = await this.usersService.findByPhone(payload.phone);
+    const user = await this.usersService.findByPhone(payload.telefon);
     if (!user) {
       throw new UnauthorizedException('Login yoki parol noto‘g‘ri.');
     }
 
+    if (user.status === UserStatus.BLOCKED) {
+      throw new ForbiddenException(
+        'Hisobingiz bloklangan. Administrator bilan bog‘laning.',
+      );
+    }
+
+    if (user.status === UserStatus.INACTIVE) {
+      throw new ForbiddenException(
+        'Hisobingiz faol emas. Administrator bilan bog‘laning.',
+      );
+    }
+
     const isPasswordValid = await this.usersService.validatePassword(
       user,
-      payload.password,
+      payload.parol,
     );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Login yoki parol noto‘g‘ri.');
@@ -87,6 +119,18 @@ export class AuthService {
       safeUser,
       payload.rememberMe ?? false,
     );
+
+    await this.usersService.markLastLogin(user.id);
+
+    await this.activityService.log({
+      userId: user.id,
+      action: 'Tizimga kirish amalga oshirildi.',
+      ip: context?.ip,
+      device: context?.userAgent,
+      meta: {
+        rememberMe: payload.rememberMe ?? false,
+      },
+    });
 
     return {
       message: 'Kirish muvaffaqiyatli.',
@@ -140,7 +184,7 @@ export class AuthService {
   }
 
   async forgotPassword(payload: ForgotPasswordDto) {
-    const user = await this.usersService.findByPhone(payload.phone);
+    const user = await this.usersService.findByPhone(payload.telefon);
 
     if (!user) {
       return {
@@ -210,10 +254,38 @@ export class AuthService {
     const user = await this.usersService.findById(storedToken.userId);
     const tokens = await this.issueTokens(user, false);
 
+    await this.activityService.log({
+      userId: storedToken.userId,
+      action: 'Parol muvaffaqiyatli yangilandi.',
+      meta: {
+        resetTokenId: storedToken.id,
+      },
+    });
+
     return {
       message: 'Parol muvaffaqiyatli yangilandi.',
       user,
       ...tokens,
+    };
+  }
+
+  async logout(userId: string, payload: LogoutDto) {
+    if (!userId) {
+      throw new UnauthorizedException('Foydalanuvchi aniqlanmadi.');
+    }
+
+    await this.revokeUserRefreshTokens(userId);
+
+    await this.activityService.log({
+      userId,
+      action: 'Tizimdan chiqdi.',
+      meta: {
+        refreshTokenBerildi: Boolean(payload.refreshToken),
+      },
+    });
+
+    return {
+      message: 'Tizimdan chiqish muvaffaqiyatli yakunlandi.',
     };
   }
 

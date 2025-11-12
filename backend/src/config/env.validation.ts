@@ -31,6 +31,10 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  CORS_ORIGINS?: string;
+
+  @IsOptional()
+  @IsString()
   JWT_ACCESS_EXPIRES_IN?: string;
 
   @IsOptional()
@@ -41,6 +45,22 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   FORGOT_PASSWORD_TOKEN_TTL_MINUTES?: number;
+
+  @IsOptional()
+  @IsString()
+  ADMIN_PHONE?: string;
+
+  @IsOptional()
+  @IsString()
+  ADMIN_PASSWORD?: string;
+
+  @IsOptional()
+  @IsString()
+  ADMIN_NAME?: string;
+
+  @IsOptional()
+  @IsString()
+  ADMIN_NICKNAME?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
