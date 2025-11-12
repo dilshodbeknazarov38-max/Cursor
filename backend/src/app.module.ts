@@ -7,6 +7,7 @@ import { AuthModule } from '@/auth/auth.module';
 import { PermissionsModule } from '@/permissions/permissions.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { RolesModule } from '@/roles/roles.module';
+import { StatsModule } from '@/stats/stats.module';
 import { UsersModule } from '@/users/users.module';
 
 import { AppController } from './app.controller';
@@ -22,6 +23,7 @@ import { AppService } from './app.service';
     PrismaModule,
     UsersModule,
     RolesModule,
+    StatsModule,
     PermissionsModule,
     AuthModule,
   ],

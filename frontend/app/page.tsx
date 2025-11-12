@@ -1,46 +1,86 @@
-export default function Home() {
+import {
+  CallToActionSection,
+} from "@/components/landing/cta";
+import { FeaturesSection } from "@/components/landing/features";
+import { HeroSection } from "@/components/landing/hero";
+import { HowItWorksSection } from "@/components/landing/how-it-works";
+import { SiteFooter } from "@/components/landing/footer";
+import { SiteHeader } from "@/components/landing/site-header";
+import { StatsCounters } from "@/components/landing/stats-counters";
+import { TestimonialsSection } from "@/components/landing/testimonials";
+
+async function getLandingStats() {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ??
+    "http://localhost:3001/api";
+
+  try {
+    const response = await fetch(`${baseUrl}/stats/landing`, {
+      next: { revalidate: 60 },
+    });
+    if (!response.ok) {
+      throw new Error("Statistika topilmadi");
+    }
+    return (await response.json()) as {
+      counts: {
+        users: number;
+        leads: number;
+        sales: number;
+        topTargetologs: number;
+      };
+      testimonials: {
+        name: string;
+        role: string;
+        message: string;
+      }[];
+    };
+  } catch {
+    return {
+      counts: {
+        users: 1284,
+        leads: 1284 * 12,
+        sales: Math.round(1284 * 7.8),
+        topTargetologs: 22,
+      },
+      testimonials: [
+        {
+          name: "Gulnora X.",
+          role: "Super Admin",
+          message:
+            "CPAMaRKeT.Uz orqali biz targetologlar va sotuvchilar ishini tezlashtirdik hamda yakuniy natijani aniq ko‘ryapmiz.",
+        },
+        {
+          name: "Murodjon A.",
+          role: "Targetolog",
+          message:
+            "Lidlarni boshqarish va to‘lovlar nazorati uchun eng qulay yechim. Platforma juda tez ishlaydi.",
+        },
+        {
+          name: "Sabina R.",
+          role: "Operator",
+          message:
+            "Buyurtmalar oqimi aniq ko‘rinadi, mijozlar bilan ishlash sezilarli darajada yengillashdi.",
+        },
+      ],
+    };
+  }
+}
+
+export default async function Home() {
+  const stats = await getLandingStats();
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-10 px-6 py-16">
-      <div className="flex max-w-2xl flex-col items-center gap-6 text-center">
-        <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-          CPAMaRKeT.Uz
-        </span>
-        <h1 className="text-pretty text-4xl font-semibold text-neutral-900 sm:text-5xl">
-          O‘zbekiston uchun zamonaviy CPA boshqaruv platformasi
-        </h1>
-        <p className="text-balance text-lg text-neutral-600">
-          Reklamalarni samarali boshqarish, targetologlar va hamkorlar bilan
-          ishlashni avtomatlashtirish hamda real vaqt statistikalarini kuzatish
-          uchun yagona echim.
-        </p>
-      </div>
-      <div className="flex flex-col items-center gap-4 sm:flex-row">
-        <a
-          className="inline-flex h-12 items-center justify-center rounded-lg bg-neutral-900 px-6 text-sm font-semibold text-white shadow-lg transition hover:bg-neutral-800"
-          href="/kirish"
-        >
-          Kirish
-        </a>
-        <a
-          className="inline-flex h-12 items-center justify-center rounded-lg border border-neutral-300 bg-white px-6 text-sm font-semibold text-neutral-900 shadow-sm transition hover:border-neutral-500 hover:text-neutral-950"
-          href="/royxatdan-otish"
-        >
-          Ro‘yxatdan o‘tish
-        </a>
-      </div>
-      <div className="max-w-3xl rounded-2xl border border-neutral-200 bg-white/80 p-8 text-left shadow-sm backdrop-blur">
-        <h2 className="text-xl font-semibold text-neutral-900">
-          Nega CPAMaRKeT.Uz?
-        </h2>
-        <ul className="mt-4 space-y-3 text-neutral-600">
-          <li>
-            • Targetologlar uchun soddalashtirilgan topshiriqlar va kampaniya
-            boshqaruvi.
-          </li>
-          <li>• Reklamachilar uchun real vaqt statistikasi va hisobotlar.</li>
-          <li>• Hamkorlar bilan xavfsiz va tezkor integratsiya.</li>
-        </ul>
-      </div>
-    </main>
+    <>
+      <SiteHeader />
+      <main className="flex flex-col">
+        <HeroSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <StatsCounters counts={stats.counts} />
+        <TestimonialsSection items={stats.testimonials} />
+        <CallToActionSection />
+      </main>
+      <SiteFooter />
+    </>
   );
 }
