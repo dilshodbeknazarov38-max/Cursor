@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { UserRole } from '@prisma/client';
 import type { StringValue } from 'ms';
 import { createHash, randomBytes } from 'crypto';
 
@@ -18,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import type { JwtPayload } from './jwt.strategy';
 
 type TokensResult = {
   accessToken: string;
@@ -49,7 +49,6 @@ export class AuthService {
       nickname: payload.nickname,
       phone: payload.phone,
       password: payload.password,
-      role: UserRole.TARGETOLOG,
     });
 
     const tokens = await this.issueTokens(safeUser, false);
@@ -98,7 +97,7 @@ export class AuthService {
 
   async refresh(payload: RefreshTokenDto) {
     const { refreshToken } = payload;
-    let decoded: { sub: string; role: UserRole };
+    let decoded: JwtPayload;
     try {
       decoded = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
@@ -246,11 +245,13 @@ export class AuthService {
         : '7d'
     ) as StringValue;
 
+    const roleSlug = user.role?.slug ?? 'TARGETOLOG';
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         {
           sub: user.id,
-          role: user.role,
+          role: roleSlug,
         },
         {
           secret: accessSecret,
@@ -260,7 +261,7 @@ export class AuthService {
       this.jwtService.signAsync(
         {
           sub: user.id,
-          role: user.role,
+          role: roleSlug,
           type: 'refresh',
         },
         {
@@ -270,7 +271,7 @@ export class AuthService {
       ),
     ]);
 
-    const refreshExpiresSeconds = durationToSeconds(refreshExpiresIn as string);
+    const refreshExpiresSeconds = durationToSeconds(String(refreshExpiresIn));
     const refreshTokenExpiresAt = new Date(
       Date.now() + refreshExpiresSeconds * 1000,
     );
