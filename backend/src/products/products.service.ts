@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, ProductStatus } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
+import { FlowStatus, Prisma, ProductStatus } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -20,7 +21,10 @@ const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN']);
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async create(dto: CreateProductDto, context: AuthContext) {
     this.assertRole(context.role, ['TAMINOTCHI']);
@@ -310,22 +314,35 @@ export class ProductsService {
       nickname: string;
       phone: string;
     } | null;
-    flows?: Array<{
-      id: string;
-      title: string;
-      urlSlug: string;
-      isActive: boolean;
-      createdAt: Date;
-      updatedAt: Date;
-      ownerId: string;
-      productId: string;
-    }>;
-  }) {
-    return {
-      ...product,
-      price: new Prisma.Decimal(product.price).toFixed(2),
-      owner: product.owner ?? undefined,
-      flows: product.flows ?? undefined,
-    };
-  }
+      flows?: Array<{
+        id: string;
+        title: string;
+        slug: string;
+        url: string;
+        status: FlowStatus;
+        clicks: number;
+        leads: number;
+        orders: number;
+        createdAt: Date;
+        updatedAt: Date;
+        ownerId: string;
+        productId: string;
+      }>;
+    }) {
+      const publicBase =
+        this.configService.get<string>('app.publicUrl') ?? 'http://localhost:3001';
+      const cleanBase = publicBase.replace(/\/$/, '');
+
+      return {
+        ...product,
+        price: new Prisma.Decimal(product.price).toFixed(2),
+        owner: product.owner ?? undefined,
+        flows: product.flows
+          ? product.flows.map((flow) => ({
+              ...flow,
+              trackingUrl: `${cleanBase}/f/${flow.slug}`,
+            }))
+          : undefined,
+      };
+    }
 }

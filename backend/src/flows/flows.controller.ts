@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -60,6 +61,24 @@ export class FlowsController {
   @Roles('TARGETOLOG', 'TAMINOTCHI', 'ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN')
   remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.flowsService.remove(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/pause')
+  @Roles('TARGETOLOG')
+  pause(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.flowsService.pauseFlow(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/activate')
+  @Roles('TARGETOLOG')
+  activate(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.flowsService.activateFlow(id, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
     });

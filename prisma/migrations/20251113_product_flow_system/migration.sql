@@ -47,21 +47,31 @@ CREATE INDEX "Product_status_idx" ON "Product"("status");
 ALTER TABLE "Product"
   ADD CONSTRAINT "Product_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+DROP TABLE IF EXISTS "Flow" CASCADE;
+
+DROP TYPE IF EXISTS "FlowStatus";
+CREATE TYPE "FlowStatus" AS ENUM ('ACTIVE', 'PAUSED');
+
 CREATE TABLE "Flow" (
   "id" TEXT NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   "title" TEXT NOT NULL,
-  "urlSlug" TEXT NOT NULL,
-  "isActive" BOOLEAN NOT NULL DEFAULT true,
+  "slug" TEXT NOT NULL,
+  "url" TEXT NOT NULL,
+  "clicks" INTEGER NOT NULL DEFAULT 0,
+  "leads" INTEGER NOT NULL DEFAULT 0,
+  "orders" INTEGER NOT NULL DEFAULT 0,
+  "status" "FlowStatus" NOT NULL DEFAULT 'ACTIVE',
   "productId" TEXT NOT NULL,
   "ownerId" TEXT NOT NULL,
   CONSTRAINT "Flow_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "Flow_urlSlug_key" ON "Flow"("urlSlug");
+CREATE UNIQUE INDEX "Flow_slug_key" ON "Flow"("slug");
 CREATE INDEX "Flow_productId_idx" ON "Flow"("productId");
 CREATE INDEX "Flow_ownerId_idx" ON "Flow"("ownerId");
+CREATE INDEX "Flow_status_idx" ON "Flow"("status");
 
 ALTER TABLE "Flow"
   ADD CONSTRAINT "Flow_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE,

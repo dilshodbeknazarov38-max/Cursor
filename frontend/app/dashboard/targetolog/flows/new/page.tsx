@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import DashboardLayout from '@/components/DashboardLayout';
-import FlowForm, { type FlowFormProduct } from '@/components/FlowForm';
+import FlowForm, { type FlowFormProduct, type FlowFormValues } from '@/components/FlowForm';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { apiGet, apiPost } from '@/lib/apiClient';
+import type { Flow } from '@/types/flow';
 
 type ApiApprovedProduct = {
   id: string;
@@ -20,7 +21,6 @@ const TargetologCreateFlowPage = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState<FlowFormProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -49,26 +49,9 @@ const TargetologCreateFlowPage = () => {
     void fetchProducts();
   }, [toast]);
 
-  const handleSubmit = async (payload: { title: string; productId: string }) => {
-    try {
-      setSubmitting(true);
-      await apiPost('/flows', payload);
-      toast({
-        title: 'Oqim yaratildi',
-        description: 'Oqim faollashtirildi va statistikaga qo‘shildi.',
-      });
-      router.push('/dashboard/targetolog/flows');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Oqim yaratishda xatolik.';
-      toast({
-        title: 'Xatolik',
-        description: message,
-        variant: 'destructive',
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSubmit = async (payload: FlowFormValues): Promise<Flow> => {
+    const response = await apiPost<Flow, FlowFormValues>('/flows', payload);
+    return response;
   };
 
   return (
@@ -78,7 +61,7 @@ const TargetologCreateFlowPage = () => {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Yangi oqim</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Tasdiqlangan mahsulotlardan birini tanlang va oqim nomini kiriting.
+              Tasdiqlangan mahsulotni tanlang, qisqa slug kiriting va tracking havolani oling.
             </p>
           </div>
           <Button variant="outline" onClick={() => router.back()}>
@@ -91,10 +74,10 @@ const TargetologCreateFlowPage = () => {
             Ma’lumotlar yuklanmoqda...
           </div>
         ) : products.length ? (
-          <FlowForm products={products} submitting={submitting} onSubmit={handleSubmit} />
+          <FlowForm products={products} onSubmit={handleSubmit} />
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white px-6 py-8 text-center text-sm text-slate-500 shadow-sm">
-            Tasdiqlangan mahsulotlar mavjud emas. Avval ombor tomonidan tasdiqlangan mahsulot kerak.
+            Tasdiqlangan mahsulotlar mavjud emas. Avval ombor tomonidan mahsulot tasdiqlanishi kerak.
           </div>
         )}
       </div>

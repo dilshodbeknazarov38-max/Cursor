@@ -3,6 +3,10 @@ import { registerAs } from '@nestjs/config';
 export const APP_CONFIG = registerAs('app', () => ({
   port: parseInt(process.env.APP_PORT ?? process.env.PORT ?? '3001', 10),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  publicUrl:
+    process.env.APP_PUBLIC_URL ??
+    process.env.API_PUBLIC_URL ??
+    `http://localhost:${process.env.APP_PORT ?? process.env.PORT ?? '3001'}`,
   corsOrigins:
     process.env.CORS_ORIGINS?.split(',').map((origin) => origin.trim()) ??
     [

@@ -7,36 +7,31 @@ import DashboardLayout from '@/components/DashboardLayout';
 import FlowTable, { type FlowTableRow } from '@/components/FlowTable';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { apiDelete, apiGet } from '@/lib/apiClient';
-
-type ApiFlow = {
-  id: string;
-  title: string;
-  urlSlug: string;
-  isActive: boolean;
-  createdAt: string;
-  product: {
-    id: string;
-    title: string;
-  };
-};
+import { apiDelete, apiGet, apiPut } from '@/lib/apiClient';
+import type { Flow } from '@/types/flow';
 
 const TargetologFlowsPage = () => {
   const { toast } = useToast();
   const [flows, setFlows] = useState<FlowTableRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const loadFlows = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await apiGet<ApiFlow[]>('/flows/me');
-      const mapped = response.map((flow) => ({
+      const response = await apiGet<Flow[]>('/flows/me');
+      const mapped: FlowTableRow[] = response.map((flow) => ({
         id: flow.id,
         title: flow.title,
-        urlSlug: flow.urlSlug,
-        productTitle: flow.product?.title ?? 'Noma’lum mahsulot',
+        slug: flow.slug,
+        trackingUrl: flow.trackingUrl,
+        clicks: flow.clicks,
+        leads: flow.leads,
+        orders: flow.orders,
+        status: flow.status,
         createdAt: flow.createdAt,
-        isActive: flow.isActive,
+        productTitle: flow.product?.title ?? 'Noma’lum mahsulot',
+        product: flow.product ?? undefined,
       }));
       setFlows(mapped);
     } catch (error) {
@@ -56,20 +51,44 @@ const TargetologFlowsPage = () => {
     void loadFlows();
   }, [loadFlows]);
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      const flow = flows.find((item) => item.id === id);
-      if (!flow) {
-        return;
+  const handleToggleStatus = useCallback(
+    async (flow: FlowTableRow) => {
+      setActionLoadingId(flow.id);
+      const endpoint = flow.status === 'ACTIVE' ? `/flows/${flow.id}/pause` : `/flows/${flow.id}/activate`;
+      try {
+        await apiPut(endpoint);
+        toast({
+          title: flow.status === 'ACTIVE' ? 'Oqim to‘xtatildi' : 'Oqim faollashtirildi',
+          description:
+            flow.status === 'ACTIVE'
+              ? `"${flow.title}" endi trafik qabul qilmaydi. Istalgan payt qayta faollashtiring.`
+              : `"${flow.title}" yana trafik qabul qilmoqda. KPI ni kuzatib boring.`,
+        });
+        await loadFlows();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Oqim holatini o‘zgartirishda xatolik.';
+        toast({
+          title: 'Xatolik',
+          description: message,
+          variant: 'destructive',
+        });
+      } finally {
+        setActionLoadingId(null);
       }
-      const confirmed = window.confirm(
-        `"${flow.title}" oqimini o‘chirishni tasdiqlaysizmi?`,
-      );
+    },
+    [loadFlows, toast],
+  );
+
+  const handleDelete = useCallback(
+    async (flow: FlowTableRow) => {
+      const confirmed = window.confirm(`"${flow.title}" oqimini o‘chirishni tasdiqlaysizmi?`);
       if (!confirmed) {
         return;
       }
+      setActionLoadingId(flow.id);
       try {
-        await apiDelete(`/flows/${id}`);
+        await apiDelete(`/flows/${flow.id}`);
         toast({
           title: 'Oqim o‘chirildi',
           description: `"${flow.title}" ro‘yxatdan olib tashlandi.`,
@@ -83,9 +102,11 @@ const TargetologFlowsPage = () => {
           description: message,
           variant: 'destructive',
         });
+      } finally {
+        setActionLoadingId(null);
       }
     },
-    [flows, loadFlows, toast],
+    [loadFlows, toast],
   );
 
   return (
@@ -112,14 +133,28 @@ const TargetologFlowsPage = () => {
           flows={flows}
           loading={loading}
           renderActions={(flow) => (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="text-xs"
-              onClick={() => handleDelete(flow.id)}
-            >
-              O‘chirish
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                disabled={actionLoadingId === flow.id}
+                onClick={() => handleToggleStatus(flow)}
+              >
+                {flow.status === 'ACTIVE' ? 'To‘xtatish' : 'Faollashtirish'}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="text-xs"
+                disabled={actionLoadingId === flow.id}
+                onClick={() => handleDelete(flow)}
+              >
+                O‘chirish
+              </Button>
+            </>
           )}
         />
       </div>

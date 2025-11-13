@@ -193,20 +193,30 @@ model Product {
   @@index([status])
 }
 
+enum FlowStatus {
+  ACTIVE
+  PAUSED
+}
+
 model Flow {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   title     String
-  urlSlug   String   @unique
-  isActive  Boolean  @default(true)
+  slug      String     @unique
+  url       String
+  clicks    Int        @default(0)
+  leads     Int        @default(0)
+  orders    Int        @default(0)
+  status    FlowStatus @default(ACTIVE)
   productId String
   ownerId   String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  owner     User     @relation("FlowOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  owner     User       @relation("FlowOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([ownerId])
+  @@index([status])
 }
 
 model BalanceAccount {
