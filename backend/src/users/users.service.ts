@@ -13,8 +13,16 @@ import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
 import { CreateUserDto } from './dto/create-user.dto';
+import { AdminListUsersQueryDto } from './dto/admin-list-users-query.dto';
 
 const PASSWORD_SALT_ROUNDS = 10;
+
+const normalizeRoleSlug = (value: string) =>
+  value
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/_+/g, '_')
+    .toUpperCase();
 
 type UserWithRole = Prisma.UserGetPayload<{ include: { role: true } }>;
 export type SafeUser = Omit<UserWithRole, 'passwordHash'>;
@@ -199,6 +207,71 @@ export class UsersService {
     return users.map((user) => this.toSafeUser(user));
   }
 
+  async adminListUsers(
+    query: AdminListUsersQueryDto,
+  ): Promise<{
+    data: SafeUser[];
+    meta: {
+      totalItems: number;
+      totalPages: number;
+      page: number;
+      limit: number;
+      hasNext: boolean;
+      hasPrevious: boolean;
+    };
+  }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const search = query.search?.trim();
+    const roleFilter = query.role?.trim();
+
+    const where: Prisma.UserWhereInput = {};
+
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { nickname: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (roleFilter) {
+      where.role = { slug: normalizeRoleSlug(roleFilter) };
+    }
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    const [users, totalItems] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        include: { role: true },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
+    return {
+      data: users.map((user) => this.toSafeUser(user)),
+      meta: {
+        totalItems,
+        totalPages,
+        page,
+        limit,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      },
+    };
+  }
+
   async findByPhone(phone: string): Promise<UserWithRole | null> {
     return this.prisma.user.findUnique({
       where: { phone },
@@ -243,12 +316,34 @@ export class UsersService {
       );
     }
 
-    if (performer.role !== 'ADMIN') {
-      throw new ForbiddenException('Faqat Admin rolni o‘zgartirishi mumkin.');
+    const performerRole = performer.role?.toUpperCase();
+    if (performerRole !== 'SUPER_ADMIN') {
+      throw new ForbiddenException(
+        'Faqat Super Admin foydalanuvchi rollarini o‘zgartirishi mumkin.',
+      );
     }
 
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('Foydalanuvchi topilmadi.');
+    }
+
+    if (
+      existingUser.role?.slug === 'SUPER_ADMIN' &&
+      performer.userId !== userId
+    ) {
+      throw new ForbiddenException(
+        'Boshqa Super Admin hisobini o‘zgartira olmaysiz.',
+      );
+    }
+
+    const normalizedRoleSlug = normalizeRoleSlug(roleSlug);
+
     const role = await this.prisma.role.findUnique({
-      where: { slug: roleSlug },
+      where: { slug: normalizedRoleSlug },
     });
 
     if (!role) {
@@ -263,10 +358,10 @@ export class UsersService {
 
     await this.activityService.log({
       userId: performer.userId,
-      action: `Foydalanuvchi roli o‘zgartirildi: ${roleSlug}`,
+      action: `Foydalanuvchi roli o‘zgartirildi: ${normalizedRoleSlug}`,
       meta: {
         targetUserId: userId,
-        newRole: roleSlug,
+        newRole: normalizedRoleSlug,
       },
     });
 
@@ -275,7 +370,7 @@ export class UsersService {
       message: `Sizning rolingiz ${role.name} ga o‘zgartirildi.`,
       type: NotificationType.USER,
       metadata: {
-        newRole: roleSlug,
+        newRole: normalizedRoleSlug,
       },
     });
 
@@ -305,9 +400,10 @@ export class UsersService {
       );
     }
 
-    if (performedBy.role !== 'ADMIN') {
+    const performerRole = performedBy.role?.toUpperCase();
+    if (performerRole !== 'SUPER_ADMIN') {
       throw new ForbiddenException(
-        'Foydalanuvchi statusini o‘zgartirishga ruxsatingiz yo‘q.',
+        'Faqat Super Admin foydalanuvchi statusini o‘zgartirishi mumkin.',
       );
     }
 
@@ -317,6 +413,12 @@ export class UsersService {
     });
     if (!user) {
       throw new NotFoundException('Foydalanuvchi topilmadi.');
+    }
+
+    if (user.role?.slug === 'SUPER_ADMIN' && performedBy.userId !== userId) {
+      throw new ForbiddenException(
+        'Boshqa Super Admin hisobini o‘zgartira olmaysiz.',
+      );
     }
 
     const updated = await this.prisma.user.update({
