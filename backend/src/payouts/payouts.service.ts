@@ -98,7 +98,18 @@ export class PayoutsService {
       throw new ForbiddenException('To‘lov statusini o‘zgartirishga ruxsat yo‘q.');
     }
 
-    const payout = await this.prisma.payout.findUnique({ where: { id } });
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            nickname: true,
+            phone: true,
+          },
+        },
+      },
+    });
     if (!payout) {
       throw new NotFoundException('To‘lov so‘rovi topilmadi.');
     }
@@ -107,6 +118,15 @@ export class PayoutsService {
       where: { id },
       data: {
         status: dto.status,
+      },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            nickname: true,
+            phone: true,
+          },
+        },
       },
     });
 
@@ -121,15 +141,26 @@ export class PayoutsService {
 
     if (dto.status === PayoutStatus.APPROVED) {
       await this.balancesService.handlePayoutApproval(
-        updated.id,
-        updated.userId,
+        {
+          id: updated.id,
+          userId: updated.userId,
+          amount: updated.amount,
+          cardNumber: updated.cardNumber ?? undefined,
+          cardHolder: updated.cardHolder ?? undefined,
+          user: payout.user,
+        },
         context.userId,
       );
     } else if (dto.status === PayoutStatus.REJECTED) {
       await this.balancesService.handlePayoutRejection(
-        updated.id,
-        updated.userId,
-        updated.amount,
+        {
+          id: updated.id,
+          userId: updated.userId,
+          amount: updated.amount,
+          cardNumber: updated.cardNumber ?? undefined,
+          cardHolder: updated.cardHolder ?? undefined,
+          user: payout.user,
+        },
         context.userId,
       );
     } else {

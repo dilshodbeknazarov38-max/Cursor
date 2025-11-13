@@ -172,6 +172,12 @@ export class OrdersService {
       where.targetologId = context.userId;
     } else if (context.role === 'OPERATOR') {
       where.operatorId = context.userId;
+    } else if (context.role === 'SOTUVCHI') {
+      where.product = {
+        is: {
+          sellerId: context.userId,
+        },
+      };
     } else if (context.role === 'SKLAD_ADMIN') {
       where.status = OrderStatus.IN_DELIVERY;
     }

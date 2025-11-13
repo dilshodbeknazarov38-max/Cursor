@@ -21,6 +21,8 @@ import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 type AuthContext = {
   userId: string;
   role: string;
+  ip?: string | null;
+  device?: string | null;
 };
 
 @Injectable()
@@ -68,6 +70,8 @@ export class LeadsService {
     await this.activityService.log({
       userId: context.userId,
       action: 'Yangi lead yaratildi.',
+      ip: context.ip,
+      device: context.device,
       meta: {
         leadId: lead.id,
         productId: lead.productId,
@@ -75,6 +79,10 @@ export class LeadsService {
       },
     });
 
+    await this.balancesService.evaluateLeadIpAbuse(
+      targetologId,
+      context.ip ?? null,
+    );
     await this.notifyTargetAdmin(
       `Yangi lead yaratildi: ${lead.product.name}`,
       lead.targetologId,

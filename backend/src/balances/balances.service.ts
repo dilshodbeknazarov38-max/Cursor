@@ -3,14 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   BalanceAccountType,
   BalanceTransaction,
   BalanceTransactionType,
   FraudCheckStatus,
   NotificationType,
+  PayoutStatus,
   Prisma,
 } from '@prisma/client';
+import { Observable, Subject } from 'rxjs';
 
 import { ActivityService } from '@/activity/activity.service';
 import { NotificationsService } from '@/notifications/notifications.service';
@@ -61,8 +64,50 @@ type TransferHoldParams = {
   mainAccountType: BalanceAccountType;
 };
 
+type PayoutUserSummary = {
+  firstName?: string | null;
+  nickname?: string | null;
+  phone?: string | null;
+};
+
+type PayoutNotificationPayload = {
+  id: string;
+  userId: string;
+  amount: Prisma.Decimal | number | string;
+  cardNumber?: string | null;
+  cardHolder?: string | null;
+  user?: PayoutUserSummary;
+};
+
+type PayoutLimitsConfig = {
+  minAmount: number;
+  dailyAmountLimit: number;
+  monthlyAmountLimit: number;
+  dailyRequestLimit: number;
+};
+
+type BalanceStreamEvent = {
+  type: 'BALANCE_UPDATED';
+};
+
+const FRAUD_IP_THRESHOLD = 15;
+const FRAUD_CARD_SCORE = 40;
+const FRAUD_IP_SCORE = 20;
+const FRAUD_SCORE_ALERT = 50;
+
 @Injectable()
 export class BalancesService {
+  private readonly balanceStreams = new Map<
+    string,
+    Subject<BalanceStreamEvent>
+  >();
+
+  private readonly payoutStatusesForLimits: PayoutStatus[] = [
+    PayoutStatus.PENDING,
+    PayoutStatus.APPROVED,
+    PayoutStatus.PAID,
+  ];
+
   private readonly ROLE_ACCOUNT_MAP: Record<string, BalanceAccountType[]> = {
     TARGETOLOG: [
       BalanceAccountType.TARGETOLOG_HOLD,
@@ -98,6 +143,7 @@ export class BalancesService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getUserBalances(userId: string) {
@@ -330,6 +376,79 @@ export class BalancesService {
           });
         }
       }
+    }
+  }
+
+  private async detectCardReuseFraud(payload: {
+    userId: string;
+    transactionId: string;
+    cardNumber?: string | null;
+  }) {
+    if (!payload.cardNumber) {
+      return;
+    }
+
+    const duplicates = await this.prisma.payout.findMany({
+      where: {
+        cardNumber: payload.cardNumber,
+        userId: { not: payload.userId },
+        status: { in: this.payoutStatusesForLimits },
+      },
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        status: true,
+      },
+      take: 5,
+    });
+
+    if (duplicates.length === 0) {
+      return;
+    }
+
+    const score = FRAUD_CARD_SCORE + duplicates.length * 5;
+
+    await this.openFraudCheck({
+      userId: payload.userId,
+      transactionId: payload.transactionId,
+      reason: 'Bir karta raqami bir nechta foydalanuvchida ishlatilmoqda.',
+      metadata: {
+        cardNumber: this.maskCardNumber(payload.cardNumber),
+        duplicates,
+        score,
+      },
+    });
+  }
+
+  async evaluateLeadIpAbuse(userId: string, ip?: string | null) {
+    if (!ip) {
+      return;
+    }
+
+    const since = new Date(Date.now() - 1000 * 60 * 60 * 6);
+    const suspectEvents = await this.prisma.activityLog.count({
+      where: {
+        userId,
+        ip,
+        action: 'Yangi lead yaratildi.',
+        createdAt: {
+          gte: since,
+        },
+      },
+    });
+
+    if (suspectEvents >= FRAUD_IP_THRESHOLD) {
+      const score = FRAUD_IP_SCORE + (suspectEvents - FRAUD_IP_THRESHOLD) * 2;
+      await this.openFraudCheck({
+        userId,
+        reason: `Bir IP manzildan ${suspectEvents} ta lead yaratildi.`,
+        metadata: {
+          ip,
+          count: suspectEvents,
+          score,
+        },
+      });
     }
   }
 
@@ -734,7 +853,12 @@ export class BalancesService {
       throw new BadRequestException('Summani musbat kiriting.');
     }
 
-    const mainAccountType = await this.resolveMainAccountTypeForUser(userId, tx);
+    await this.enforcePayoutLimits(userId, amountDecimal, tx);
+
+    const mainAccountType = await this.resolveMainAccountTypeForUser(
+      userId,
+      tx,
+    );
 
     const result = await this.applyTransaction({
       userId,
@@ -751,42 +875,70 @@ export class BalancesService {
       tx,
     });
 
+    await this.detectCardReuseFraud(
+      {
+        userId,
+        transactionId: result.transaction.id,
+        cardNumber: cardPayload.cardNumber,
+      },
+    );
+
+    if (tx) {
+      setTimeout(() => this.emitBalanceStream(userId), 0);
+    }
+
     return result.transaction;
   }
 
   async handlePayoutApproval(
-    payoutId: string,
-    userId: string,
+    payout: PayoutNotificationPayload,
     actorId?: string,
   ) {
+    const userId = payout.userId;
+    const amountDecimal = new Prisma.Decimal(payout.amount);
+    const displayName = this.resolvePayoutDisplayName(
+      payout.user,
+      payout.userId,
+    );
+    const formattedAmount = this.formatAmount(amountDecimal, true).replace(
+      '+ ',
+      '',
+    );
+    const maskedCard = this.maskCardNumber(payout.cardNumber);
+
     await this.activityService.log({
       userId: actorId ?? userId,
       action: 'To‘lov so‘rovi tasdiqlandi.',
       meta: {
-        payoutId,
+        payoutId: payout.id,
         targetUserId: userId,
       },
     });
 
     await this.notificationsService.create({
       toUserId: userId,
-      message: 'To‘lovingiz tasdiqlandi va qayta ishlanmoqda.',
+      message: `To‘lovingiz tasdiqlandi. Summa: ${formattedAmount}.`,
       type: NotificationType.PAYOUT,
       metadata: {
-        payoutId,
+        payoutId: payout.id,
         status: 'APPROVED',
+        cardNumber: maskedCard,
       },
     });
+
+    await this.notificationsService.sendTelegramMessage(
+      `✅ Payout tasdiqlandi\n• Foydalanuvchi: ${displayName}\n• Miqdor: ${formattedAmount}\n• Karta: ${maskedCard}\n• Payout ID: ${payout.id}`,
+    );
   }
 
   async handlePayoutRejection(
-    payoutId: string,
-    userId: string,
-    amount: Prisma.Decimal | string | number,
+    payout: PayoutNotificationPayload,
     actorId?: string,
   ) {
+    const userId = payout.userId;
+    const amountDecimal = new Prisma.Decimal(payout.amount);
+
     const mainAccountType = await this.resolveMainAccountTypeForUser(userId);
-    const amountDecimal = new Prisma.Decimal(amount);
 
     await this.applyTransaction({
       userId,
@@ -796,20 +948,35 @@ export class BalancesService {
       isCredit: true,
       note: 'To‘lov so‘rovi rad etildi, mablag‘ qaytarildi.',
       metadata: {
-        payoutId,
+        payoutId: payout.id,
       },
       actorId,
     });
+
+    const displayName = this.resolvePayoutDisplayName(
+      payout.user,
+      payout.userId,
+    );
+    const formattedAmount = this.formatAmount(amountDecimal, true).replace(
+      '+ ',
+      '',
+    );
+    const maskedCard = this.maskCardNumber(payout.cardNumber);
 
     await this.notificationsService.create({
       toUserId: userId,
       message: 'To‘lov so‘rovi rad etildi. Mablag‘ingiz balansga qaytarildi.',
       type: NotificationType.PAYOUT,
       metadata: {
-        payoutId,
+        payoutId: payout.id,
         status: 'REJECTED',
+        cardNumber: maskedCard,
       },
     });
+
+    await this.notificationsService.sendTelegramMessage(
+      `⚠️ Payout rad etildi\n• Foydalanuvchi: ${displayName}\n• Miqdor: ${formattedAmount}\n• Karta: ${maskedCard}\n• Payout ID: ${payout.id}`,
+    );
   }
 
   async getFraudChecks(status?: FraudCheckStatus) {
@@ -943,6 +1110,8 @@ export class BalancesService {
           },
         });
       }
+
+      this.emitBalanceStream(params.userId);
     }
 
     return result;
@@ -1101,6 +1270,124 @@ export class BalancesService {
         amount: amountDecimal.toString(),
       },
     });
+    this.emitBalanceStream(params.userId);
+  }
+
+  subscribeToBalance(userId: string): Observable<BalanceStreamEvent> {
+    let stream = this.balanceStreams.get(userId);
+    if (!stream) {
+      stream = new Subject<BalanceStreamEvent>();
+      this.balanceStreams.set(userId, stream);
+      setTimeout(() => stream?.next({ type: 'BALANCE_UPDATED' }), 0);
+    }
+    return stream.asObservable();
+  }
+
+  private emitBalanceStream(userId: string) {
+    const stream = this.balanceStreams.get(userId);
+    stream?.next({ type: 'BALANCE_UPDATED' });
+  }
+
+  private getPayoutLimits(): PayoutLimitsConfig {
+    const raw = this.configService.get<PayoutLimitsConfig>('app.payoutLimits');
+    return {
+      minAmount: this.normalizeLimit(raw?.minAmount),
+      dailyAmountLimit: this.normalizeLimit(raw?.dailyAmountLimit),
+      monthlyAmountLimit: this.normalizeLimit(raw?.monthlyAmountLimit),
+      dailyRequestLimit: this.normalizeLimit(raw?.dailyRequestLimit),
+    };
+  }
+
+  private normalizeLimit(value?: number): number {
+    if (!value || Number.isNaN(value) || value <= 0) {
+      return 0;
+    }
+    return value;
+  }
+
+  private async enforcePayoutLimits(
+    userId: string,
+    amount: Prisma.Decimal,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const limits = this.getPayoutLimits();
+    const client = tx ?? this.prisma;
+
+    if (limits.minAmount > 0) {
+      const minAmountDecimal = new Prisma.Decimal(limits.minAmount);
+      if (amount.lt(minAmountDecimal)) {
+        throw new BadRequestException(
+          `Minimal payout summasi ${this.formatAmount(
+            minAmountDecimal,
+            true,
+          ).replace('+ ', '')}.`,
+        );
+      }
+    }
+
+    const statuses = this.payoutStatusesForLimits;
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    if (limits.dailyAmountLimit > 0) {
+      const aggregate = await client.payout.aggregate({
+        where: {
+          userId,
+          status: { in: statuses },
+          createdAt: { gte: startOfDay },
+        },
+        _sum: { amount: true },
+      });
+      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+        amount,
+      );
+      if (projected.gt(limits.dailyAmountLimit)) {
+        throw new BadRequestException(
+          `Kunlik yechib olish limiti ${this.formatAmount(
+            new Prisma.Decimal(limits.dailyAmountLimit),
+            true,
+          ).replace('+ ', '')} ga yetdi.`,
+        );
+      }
+    }
+
+    if (limits.monthlyAmountLimit > 0) {
+      const aggregate = await client.payout.aggregate({
+        where: {
+          userId,
+          status: { in: statuses },
+          createdAt: { gte: startOfMonth },
+        },
+        _sum: { amount: true },
+      });
+      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+        amount,
+      );
+      if (projected.gt(limits.monthlyAmountLimit)) {
+        throw new BadRequestException(
+          `Oylik yechib olish limiti ${this.formatAmount(
+            new Prisma.Decimal(limits.monthlyAmountLimit),
+            true,
+          ).replace('+ ', '')} dan oshib ketdi.`,
+        );
+      }
+    }
+
+    if (limits.dailyRequestLimit > 0) {
+      const count = await client.payout.count({
+        where: {
+          userId,
+          status: { in: statuses },
+          createdAt: { gte: startOfDay },
+        },
+      });
+      if (count + 1 > limits.dailyRequestLimit) {
+        throw new BadRequestException(
+          `Kunlik payout so‘rovlar chegarasi (${limits.dailyRequestLimit} ta) oshib ketdi.`,
+        );
+      }
+    }
   }
 
   private async ensureAccountsForRole(
@@ -1161,6 +1448,20 @@ export class BalancesService {
     );
   }
 
+  private maskCardNumber(cardNumber?: string | null) {
+    if (!cardNumber) {
+      return '—';
+    }
+    return cardNumber.replace(/.(?=.{4})/g, '•');
+  }
+
+  private resolvePayoutDisplayName(
+    user?: PayoutUserSummary,
+    fallback?: string,
+  ) {
+    return user?.nickname ?? user?.firstName ?? fallback ?? 'Noma’lum foydalanuvchi';
+  }
+
   private formatAmount(amount: Prisma.Decimal, isCredit: boolean) {
     const numeric = Number(amount.toFixed(2));
 
@@ -1203,13 +1504,16 @@ export class BalancesService {
 
   private async openFraudCheck(payload: {
     userId: string;
-    transactionId: string;
+    transactionId?: string | null;
     reason: string;
     metadata?: Prisma.InputJsonValue;
   }) {
     const existing = await this.prisma.balanceFraudCheck.findFirst({
       where: {
-        transactionId: payload.transactionId,
+        userId: payload.userId,
+        ...(payload.transactionId
+          ? { transactionId: payload.transactionId }
+          : { reason: payload.reason }),
         status: {
           in: [FraudCheckStatus.OPEN, FraudCheckStatus.REVIEWING],
         },
@@ -1223,9 +1527,9 @@ export class BalancesService {
     return this.prisma.balanceFraudCheck.create({
       data: {
         userId: payload.userId,
-        transactionId: payload.transactionId,
+        transactionId: payload.transactionId ?? null,
         reason: payload.reason,
-        metadata: payload.metadata,
+        metadata: payload.metadata ?? Prisma.JsonNull,
       },
     });
   }

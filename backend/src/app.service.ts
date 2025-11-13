@@ -1,7 +1,17 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { UserStatus } from '@prisma/client';
+import {
+  BalanceAccountType,
+  BalanceTransactionType,
+  FraudCheckStatus,
+  LeadStatus,
+  OrderStatus,
+  PayoutStatus,
+  Prisma,
+  ProductStatus,
+  UserStatus,
+} from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -242,6 +252,7 @@ export class AppService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedAccessControl();
+    await this.seedDemoData();
   }
 
   getHello(): string {
@@ -302,6 +313,253 @@ export class AppService implements OnModuleInit {
       }
 
       await this.ensureDefaultAdmin(tx);
+    });
+  }
+
+  private async seedDemoData() {
+    const existingTransactions = await this.prisma.balanceTransaction.count();
+    if (existingTransactions > 0) {
+      return;
+    }
+
+    const roles = await this.prisma.role.findMany({
+      where: {
+        slug: {
+          in: ['TARGETOLOG', 'SOTUVCHI', 'OPERATOR'],
+        },
+      },
+    });
+    const roleMap = new Map(roles.map((role) => [role.slug, role]));
+
+    const targetRole = roleMap.get('TARGETOLOG');
+    const sellerRole = roleMap.get('SOTUVCHI');
+    const operatorRole = roleMap.get('OPERATOR');
+
+    if (!targetRole || !sellerRole || !operatorRole) {
+      return;
+    }
+
+    const demoPasswordHash = await bcrypt.hash(
+      'Demo1234!',
+      PASSWORD_SALT_ROUNDS,
+    );
+
+    const targetUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000001' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: targetRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Targetolog',
+        nickname: 'demo_targetolog',
+        phone: '+998900000001',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: targetRole.id,
+      },
+    });
+
+    const sellerUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000002' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: sellerRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Sotuvchi',
+        nickname: 'demo_sotuvchi',
+        phone: '+998900000002',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: sellerRole.id,
+      },
+    });
+
+    const operatorUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000003' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: operatorRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Operator',
+        nickname: 'demo_operator',
+        phone: '+998900000003',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: operatorRole.id,
+      },
+    });
+
+    const productSlug = `demo-product-${sellerUser.id.slice(0, 8)}`;
+    const product = await this.prisma.product.upsert({
+      where: { slug: productSlug },
+      update: {},
+      create: {
+        name: 'Demo mahsulot',
+        slug: productSlug,
+        category: 'Demo',
+        shortDescription: 'Demo mahsulot uchun qisqa tavsif.',
+        fullDescription: 'Demo mahsulotning to‘liq tavsifi.',
+        price: new Prisma.Decimal('350000'),
+        cpaTargetolog: new Prisma.Decimal('150000'),
+        cpaOperator: new Prisma.Decimal('80000'),
+        mainImageUrl: '/static/placeholders/product.png',
+        smartLinkUrl: 'https://example.com/demo-product',
+        status: ProductStatus.ACTIVE,
+        sellerId: sellerUser.id,
+        tags: ['demo', 'mahsulot'],
+        trafficSources: ['facebook', 'instagram'],
+      },
+    });
+
+    const lead = await this.prisma.lead.create({
+      data: {
+        productId: product.id,
+        targetologId: targetUser.id,
+        status: LeadStatus.TASDIQLANGAN,
+        notes: 'Demo lid avtomatik yaratilgan.',
+      },
+    });
+
+    await this.prisma.order.create({
+      data: {
+        productId: product.id,
+        targetologId: targetUser.id,
+        operatorId: operatorUser.id,
+        leadId: lead.id,
+        status: OrderStatus.DELIVERED,
+        amount: new Prisma.Decimal('350000'),
+      },
+    });
+
+    const targetMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: targetUser.id,
+          type: BalanceAccountType.TARGETOLOG_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('250000'),
+      },
+      create: {
+        userId: targetUser.id,
+        type: BalanceAccountType.TARGETOLOG_MAIN,
+        amount: new Prisma.Decimal('250000'),
+      },
+    });
+
+    const operatorMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: operatorUser.id,
+          type: BalanceAccountType.OPERATOR_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('80000'),
+      },
+      create: {
+        userId: operatorUser.id,
+        type: BalanceAccountType.OPERATOR_MAIN,
+        amount: new Prisma.Decimal('80000'),
+      },
+    });
+
+    const sellerMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: sellerUser.id,
+          type: BalanceAccountType.SELLER_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('420000'),
+      },
+      create: {
+        userId: sellerUser.id,
+        type: BalanceAccountType.SELLER_MAIN,
+        amount: new Prisma.Decimal('420000'),
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: targetMainAccount.id,
+        userId: targetUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('150000'),
+        balanceBefore: new Prisma.Decimal('100000'),
+        balanceAfter: new Prisma.Decimal('250000'),
+        isCredit: true,
+        note: 'Demo lead sotildi.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: operatorMainAccount.id,
+        userId: operatorUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('80000'),
+        balanceBefore: new Prisma.Decimal('0'),
+        balanceAfter: new Prisma.Decimal('80000'),
+        isCredit: true,
+        note: 'Demo operator mukofoti.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: sellerMainAccount.id,
+        userId: sellerUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('420000'),
+        balanceBefore: new Prisma.Decimal('0'),
+        balanceAfter: new Prisma.Decimal('420000'),
+        isCredit: true,
+        note: 'Demo sotuvchi daromadi.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.payout.create({
+      data: {
+        userId: targetUser.id,
+        amount: new Prisma.Decimal('200000'),
+        status: PayoutStatus.PENDING,
+        cardNumber: '8600123412341234',
+        cardHolder: 'DEMO TARGETOLOG',
+        comment: 'Demo payout so‘rovi',
+      },
+    });
+
+    await this.prisma.balanceFraudCheck.create({
+      data: {
+        userId: targetUser.id,
+        status: FraudCheckStatus.REVIEWING,
+        reason: 'Demo fraud kuzatuvi',
+        metadata: {
+          score: 35,
+          note: 'Demo ma’lumot',
+        },
+      },
     });
   }
 

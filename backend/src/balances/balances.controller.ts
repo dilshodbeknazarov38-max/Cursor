@@ -2,14 +2,19 @@ import {
   Body,
   Controller,
   Get,
+  MessageEvent,
   Param,
   Patch,
   Post,
   Query,
   Req,
+  Sse,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { BalanceAccountType, FraudCheckStatus } from '@prisma/client';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { Roles } from '@/common/decorators/roles.decorator';
@@ -37,6 +42,20 @@ export class BalancesController {
     @Query() query: QueryTransactionsDto,
   ) {
     return this.balancesService.getUserTransactions(req.user.sub, query);
+  }
+
+  @Sse('me/stream')
+  streamMyBalances(@Req() req: any): Observable<MessageEvent> {
+    const userId = req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException(
+        'Balans oqimini kuzatish uchun foydalanuvchi aniqlanmadi.',
+      );
+    }
+
+    return this.balancesService
+      .subscribeToBalance(userId)
+      .pipe(map(() => ({ data: { type: 'BALANCE_UPDATED' } })));
   }
 
   @Get(':userId')
