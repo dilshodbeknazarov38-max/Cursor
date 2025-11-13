@@ -37,7 +37,7 @@ export class AdminAnalyticsService {
       this.prisma.order.aggregate({
         where: { status: OrderStatus.DELIVERED },
         _sum: { amount: true },
-        _count: { _all: true },
+        _count: true,
       }),
       this.prisma.flow.count(),
       this.prisma.userBalance.aggregate({
@@ -46,7 +46,7 @@ export class AdminAnalyticsService {
       this.prisma.payoutRequest.aggregate({
         where: { status: PayoutStatus.PENDING },
         _sum: { amount: true },
-        _count: { _all: true },
+        _count: true,
       }),
       this.prisma.flow.findMany({
         orderBy: [{ leads: 'desc' }, { orders: 'desc' }],
@@ -66,13 +66,16 @@ export class AdminAnalyticsService {
           status: OrderStatus.DELIVERED,
           createdAt: { gte: rangeStart },
         },
-        _count: { _all: true },
+        _count: true,
         _sum: { amount: true },
+        orderBy: {
+          targetologId: 'asc',
+        },
       }),
       this.prisma.order.groupBy({
         by: ['operatorId'],
         where: {
-          operatorId: { not: null },
+          operatorId: { not: undefined },
           status: {
             in: [
               OrderStatus.PACKING,
@@ -83,7 +86,10 @@ export class AdminAnalyticsService {
           },
           updatedAt: { gte: rangeStart },
         },
-        _count: { _all: true },
+        _count: true,
+        orderBy: {
+          operatorId: 'asc',
+        },
       }),
     ]);
 
@@ -94,22 +100,20 @@ export class AdminAnalyticsService {
       .map((group) => group.operatorId)
       .filter((value): value is string => Boolean(value));
 
-    const [targetologUsers, operatorUsers] = await this.prisma.$transaction([
-      targetologIds.length
-        ? this.prisma.user.findMany({
+      const targetologUsers = targetologIds.length
+        ? await this.prisma.user.findMany({
             where: { id: { in: targetologIds } },
             select: { id: true, firstName: true, nickname: true },
           })
-        : Promise.resolve([]),
-      operatorIds.length
-        ? this.prisma.user.findMany({
+        : [];
+      const operatorUsers = operatorIds.length
+        ? await this.prisma.user.findMany({
             where: { id: { in: operatorIds } },
             select: { id: true, firstName: true, nickname: true },
           })
-        : Promise.resolve([]),
-    ]);
+        : [];
 
-    const revenueTotal = this.toNumber(deliveredOrdersAggregate._sum.amount);
+      const revenueTotal = this.toNumber(deliveredOrdersAggregate._sum?.amount);
     const holdTotal = this.toNumber(balanceAggregate._sum?.holdBalance);
     const mainTotal = this.toNumber(balanceAggregate._sum?.mainBalance);
 
@@ -125,7 +129,7 @@ export class AdminAnalyticsService {
           newInRange: newUsersRange,
         },
         leads: totalLeads,
-        orders: deliveredOrdersAggregate._count._all ?? 0,
+          orders: deliveredOrdersAggregate._count ?? 0,
         revenue: revenueTotal,
         flows: flowsCount,
         balances: {
@@ -134,8 +138,8 @@ export class AdminAnalyticsService {
           total: holdTotal + mainTotal,
         },
         payouts: {
-          pendingCount: pendingPayoutAggregate._count._all ?? 0,
-          pendingAmount: this.toNumber(pendingPayoutAggregate._sum.amount),
+            pendingCount: pendingPayoutAggregate._count ?? 0,
+            pendingAmount: this.toNumber(pendingPayoutAggregate._sum?.amount),
         },
       },
       topFlows: topFlows.map((flow) => ({
@@ -150,8 +154,8 @@ export class AdminAnalyticsService {
             name: user
               ? `${user.firstName} (${user.nickname})`
               : group.targetologId ?? 'Noma’lum targetolog',
-            orders: group._count._all ?? 0,
-            revenue: this.toNumber(group._sum.amount),
+              orders: group._count ?? 0,
+              revenue: this.toNumber(group._sum?.amount),
           };
         })
         .sort((a, b) => b.orders - a.orders)
@@ -164,7 +168,7 @@ export class AdminAnalyticsService {
             name: user
               ? `${user.firstName} (${user.nickname})`
               : group.operatorId ?? 'Noma’lum operator',
-            handledOrders: group._count._all ?? 0,
+              handledOrders: group._count ?? 0,
           };
         })
         .sort((a, b) => b.handledOrders - a.handledOrders)
@@ -177,40 +181,44 @@ export class AdminAnalyticsService {
     const rangeStart = this.startOfDay(this.subtractDays(new Date(), rangeDays - 1));
     const dateKeys = this.getDateKeys(rangeStart, rangeDays);
 
-    const [leads, orders, payouts, transactions, operatorStatusGroups] =
-      await this.prisma.$transaction([
-        this.prisma.lead.findMany({
-          where: { createdAt: { gte: rangeStart } },
-          select: { createdAt: true },
-        }),
-        this.prisma.order.findMany({
-          where: { createdAt: { gte: rangeStart } },
-          select: { createdAt: true, status: true, amount: true },
-        }),
-        this.prisma.payoutRequest.findMany({
-          where: {
-            status: {
-              in: [PayoutStatus.APPROVED, PayoutStatus.REJECTED, PayoutStatus.PENDING],
+      const [leads, orders, payouts, transactions, operatorStatusGroups] =
+        await this.prisma.$transaction([
+          this.prisma.lead.findMany({
+            where: { createdAt: { gte: rangeStart } },
+            select: { createdAt: true },
+          }),
+          this.prisma.order.findMany({
+            where: { createdAt: { gte: rangeStart } },
+            select: { createdAt: true, status: true, amount: true },
+          }),
+          this.prisma.payoutRequest.findMany({
+            where: {
+              status: {
+                in: [PayoutStatus.APPROVED, PayoutStatus.REJECTED, PayoutStatus.PENDING],
+              },
+              createdAt: { gte: rangeStart },
             },
-            createdAt: { gte: rangeStart },
-          },
-          select: { createdAt: true, status: true, amount: true },
-        }),
-        this.prisma.transaction.findMany({
-          where: {
-            createdAt: { gte: rangeStart },
-          },
-          select: { createdAt: true, amount: true, type: true },
-        }),
-        this.prisma.order.groupBy({
-          by: ['operatorId', 'status'],
-          where: {
-            operatorId: { not: null },
-            updatedAt: { gte: rangeStart },
-          },
-          _count: { _all: true },
-        }),
-      ]);
+            select: { createdAt: true, status: true, amount: true },
+          }),
+          this.prisma.transaction.findMany({
+            where: {
+              createdAt: { gte: rangeStart },
+            },
+            select: { createdAt: true, amount: true, type: true },
+          }),
+          this.prisma.order.groupBy({
+            by: ['operatorId', 'status'],
+            where: {
+              operatorId: { not: undefined },
+              updatedAt: { gte: rangeStart },
+            },
+            _count: true,
+            orderBy: [
+              { operatorId: 'asc' },
+              { status: 'asc' },
+            ],
+          }),
+        ]);
 
     const dailyLeads = this.zeroFill(dateKeys, leads.map((lead) => lead.createdAt));
     const dailyOrders = this.zeroFill(
@@ -240,13 +248,13 @@ export class AdminAnalyticsService {
 
     for (const group of operatorStatusGroups) {
       const operatorId = group.operatorId ?? 'UNKNOWN';
-      const entry =
-        operatorMap.get(operatorId) ??
-        {
-          id: operatorId,
-          counts: {},
-        };
-      entry.counts[group.status] = (entry.counts[group.status] ?? 0) + (group._count._all ?? 0);
+        const entry =
+          operatorMap.get(operatorId) ??
+          {
+            id: operatorId,
+            counts: {},
+          };
+        entry.counts[group.status] = (entry.counts[group.status] ?? 0) + (group._count ?? 0);
       operatorMap.set(operatorId, entry);
     }
 

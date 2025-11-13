@@ -1,14 +1,5 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Put,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 
 import { Roles } from '@/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';

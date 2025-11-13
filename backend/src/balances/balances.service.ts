@@ -319,10 +319,10 @@ export class BalancesService {
     }
 
     const orderWithOperator = await this.prisma.order.findFirst({
-      where: {
-        leadId,
-        operatorId: { not: null },
-      },
+        where: {
+          leadId,
+          operatorId: { not: undefined },
+        },
       include: {
         operator: {
           select: {
@@ -532,7 +532,7 @@ export class BalancesService {
     const orderWithOperator = await this.prisma.order.findFirst({
       where: {
         leadId,
-        operatorId: { not: null },
+          operatorId: { not: undefined },
       },
       include: {
         operator: {
@@ -1339,7 +1339,7 @@ export class BalancesService {
         },
         _sum: { amount: true },
       });
-      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+      const projected = new Prisma.Decimal(aggregate._sum?.amount ?? 0).plus(
         amount,
       );
       if (projected.gt(limits.dailyAmountLimit)) {
@@ -1361,7 +1361,7 @@ export class BalancesService {
         },
         _sum: { amount: true },
       });
-      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+      const projected = new Prisma.Decimal(aggregate._sum?.amount ?? 0).plus(
         amount,
       );
       if (projected.gt(limits.monthlyAmountLimit)) {

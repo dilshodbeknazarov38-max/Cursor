@@ -1,14 +1,5 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Put,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { Request } from 'express';
+import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { UserStatus } from '@prisma/client';
 
 import { Roles } from '@/common/decorators/roles.decorator';

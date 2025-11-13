@@ -25,52 +25,46 @@ export class FraudService {
   async getOverview() {
     const lookbackDate = this.subtractDays(new Date(), this.lookbackDays);
 
-    const [
-      duplicatePhoneGroups,
-      ipGroups,
-      cardGroups,
-      highValueTransactions,
-      cancelledLeads,
-      openFraudChecks,
-    ] = await this.prisma.$transaction([
-      this.prisma.lead.groupBy({
-        by: ['phone'],
-        where: {
-          createdAt: { gte: lookbackDate },
-        },
-        _count: { _all: true },
-        having: {
-          _count: {
-            _all: { gt: this.duplicatePhoneThreshold - 1 },
+      const [
+        duplicatePhoneGroupsRaw,
+        ipGroupsRaw,
+        cardGroupsRaw,
+        highValueTransactions,
+        cancelledLeads,
+        openFraudChecks,
+      ] = await this.prisma.$transaction([
+        this.prisma.lead.groupBy({
+          by: ['phone'],
+          where: {
+            createdAt: { gte: lookbackDate },
           },
-        },
-      }),
-      this.prisma.lead.groupBy({
-        by: ['sourceIp'],
-        where: {
-          sourceIp: { not: null },
-          createdAt: { gte: lookbackDate },
-        },
-        _count: { _all: true },
-        having: {
-          _count: {
-            _all: { gt: this.suspiciousIpThreshold - 1 },
+          _count: true,
+          orderBy: {
+            phone: 'asc',
           },
-        },
-      }),
-      this.prisma.payoutRequest.groupBy({
-        by: ['cardNumber'],
-        where: {
-          cardNumber: { not: null },
-          createdAt: { gte: lookbackDate },
-        },
-        _count: { _all: true },
-        having: {
-          _count: {
-            _all: { gt: this.sharedCardThreshold - 1 },
+        }),
+        this.prisma.lead.groupBy({
+          by: ['sourceIp'],
+          where: {
+            sourceIp: { not: undefined },
+            createdAt: { gte: lookbackDate },
           },
-        },
-      }),
+          _count: true,
+          orderBy: {
+            sourceIp: 'asc',
+          },
+        }),
+        this.prisma.payoutRequest.groupBy({
+          by: ['cardNumber'],
+          where: {
+            cardNumber: { not: undefined },
+            createdAt: { gte: lookbackDate },
+          },
+          _count: true,
+          orderBy: {
+            cardNumber: 'asc',
+          },
+        }),
       this.prisma.transaction.findMany({
         where: {
           amount: { gte: this.highValueTransactionLimit },
@@ -127,8 +121,18 @@ export class FraudService {
       }),
     ]);
 
-    const duplicatePhones = await this.buildDuplicatePhoneDetails(
-      duplicatePhoneGroups,
+      const duplicatePhoneGroups = duplicatePhoneGroupsRaw.filter(
+        (group) => (group._count ?? 0) > this.duplicatePhoneThreshold - 1,
+      );
+      const ipGroups = ipGroupsRaw.filter(
+        (group) => (group._count ?? 0) > this.suspiciousIpThreshold - 1,
+      );
+      const cardGroups = cardGroupsRaw.filter(
+        (group) => (group._count ?? 0) > this.sharedCardThreshold - 1,
+      );
+
+      const duplicatePhones = await this.buildDuplicatePhoneDetails(
+        duplicatePhoneGroups,
       lookbackDate,
     );
 
@@ -186,7 +190,7 @@ export class FraudService {
   }
 
   private async buildDuplicatePhoneDetails(
-    groups: Array<{ phone: string | null; _count: { _all: number } }>,
+    groups: Array<{ phone: string | null; _count: number }>,
     lookbackDate: Date,
   ) {
     const phones = groups
@@ -226,9 +230,11 @@ export class FraudService {
     >();
 
     for (const phone of phones) {
+      const count =
+        groups.find((item) => item.phone === phone)?._count ?? 0;
       grouped.set(phone, {
         phone,
-        count: groups.find((item) => item.phone === phone)?._count._all ?? 0,
+        count,
         leads: [],
       });
     }
@@ -250,7 +256,7 @@ export class FraudService {
   }
 
   private async buildSuspiciousIpDetails(
-    groups: Array<{ sourceIp: string | null; _count: { _all: number } }>,
+    groups: Array<{ sourceIp: string | null; _count: number }>,
     lookbackDate: Date,
   ) {
     const ips = groups
@@ -285,9 +291,11 @@ export class FraudService {
     >();
 
     for (const ip of ips) {
+      const count =
+        groups.find((candidate) => candidate.sourceIp === ip)?._count ?? 0;
       grouped.set(ip, {
         ip,
-        count: groups.find((candidate) => candidate.sourceIp === ip)?._count._all ?? 0,
+        count,
         leads: [],
       });
     }
@@ -310,7 +318,7 @@ export class FraudService {
   }
 
   private async buildSharedCardDetails(
-    groups: Array<{ cardNumber: string | null; _count: { _all: number } }>,
+    groups: Array<{ cardNumber: string | null; _count: number }>,
   ) {
     const cards = groups
       .map((group) => group.cardNumber)
@@ -347,9 +355,11 @@ export class FraudService {
     >();
 
     for (const card of cards) {
+      const count =
+        groups.find((candidate) => candidate.cardNumber === card)?._count ?? 0;
       grouped.set(card, {
         cardNumber: card,
-        count: groups.find((candidate) => candidate.cardNumber === card)?._count._all ?? 0,
+        count,
         payouts: [],
       });
     }

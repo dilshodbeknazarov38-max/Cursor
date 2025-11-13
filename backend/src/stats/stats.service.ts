@@ -104,20 +104,23 @@ export class StatsService {
       this.prisma.order.groupBy({
         by: ['targetologId'],
         where: { status: OrderStatus.DELIVERED },
-        _count: { _all: true },
+        _count: true,
         orderBy: {
-          _count: { _all: 'desc' },
+          targetologId: 'asc',
         },
-        take: 5,
       }),
     ]);
 
+    const topTargetologsSorted = [...topTargetologsRaw]
+      .sort((a, b) => (b._count ?? 0) - (a._count ?? 0))
+      .slice(0, 5);
+
     const targetologUsers =
-      topTargetologsRaw.length > 0
+      topTargetologsSorted.length > 0
         ? await this.prisma.user.findMany({
             where: {
               id: {
-                in: topTargetologsRaw
+                in: topTargetologsSorted
                   .map((item) => item.targetologId)
                   .filter((value): value is string => Boolean(value)),
               },
@@ -126,7 +129,7 @@ export class StatsService {
           })
         : [];
 
-    const topTargetologs = topTargetologsRaw.map((record) => {
+    const topTargetologs = topTargetologsSorted.map((record) => {
       const user = targetologUsers.find(
         (candidate) => candidate.id === record.targetologId,
       );
@@ -135,7 +138,7 @@ export class StatsService {
         fullName: user
           ? `${user.firstName} (${user.nickname})`
           : 'Noma’lum targetolog',
-        orders: Number(record._count?._all ?? 0),
+        orders: record._count ?? 0,
       };
     });
 
@@ -259,11 +262,12 @@ export class StatsService {
           status: LeadStatus.CALLBACK,
         },
       }),
-      this.prisma.order.groupBy({
-        by: ['status'],
-        where: context.orderWhere,
-        _count: { _all: true },
-      }),
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: context.orderWhere,
+          _count: true,
+          orderBy: { status: 'asc' },
+        }),
       this.prisma.activityLog.findMany({
         where: context.activityWhere,
         take: 20,
@@ -317,8 +321,8 @@ export class StatsService {
       ordersToday,
       pendingPayouts,
       deliveredOrders: totalDeliveredOrders,
-      deliveredRevenue: Number(deliveredRevenue._sum.amount ?? 0),
-      approvedPayouts: Number(approvedPayoutSum._sum.amount ?? 0),
+      deliveredRevenue: Number(deliveredRevenue._sum?.amount ?? 0),
+      approvedPayouts: Number(approvedPayoutSum._sum?.amount ?? 0),
       totalLeads,
       totalUsers: activeUsers,
       leadRecontactCount,
@@ -447,15 +451,15 @@ export class StatsService {
       role === 'TARGETOLOG' ? this.getFlowPerformance(userId) : Promise.resolve([]),
     ]);
 
-    const clicks =
-      role === 'TARGETOLOG'
-        ? Number(flowAggregate?._sum.clicks ?? 0)
-        : 0;
+      const clicks =
+        role === 'TARGETOLOG'
+          ? Number(flowAggregate?._sum?.clicks ?? 0)
+          : 0;
 
     const leadsMetric = leadCount;
     const confirmedOrdersMetric =
       role === 'TARGETOLOG' || role === 'OPERATOR' ? confirmedOrders : 0;
-    const revenue = Number(revenueAggregate._sum.amount ?? 0);
+    const revenue = Number(revenueAggregate._sum?.amount ?? 0);
 
     const holdDecimal = new Prisma.Decimal(balanceRow?.holdBalance ?? 0);
     const mainDecimal = new Prisma.Decimal(balanceRow?.mainBalance ?? 0);
@@ -510,7 +514,7 @@ export class StatsService {
       this.prisma.payoutRequest.aggregate({
         where: { status: PayoutStatus.PENDING },
         _sum: { amount: true },
-        _count: { _all: true },
+          _count: true,
       }),
       this.prisma.payoutRequest.findMany({
         where: { status: PayoutStatus.PENDING },
@@ -575,8 +579,8 @@ export class StatsService {
       }),
     ]);
 
-    const pendingAmount =
-      pendingPayoutAggregate._sum.amount?.toFixed(2) ?? '0.00';
+      const pendingAmount =
+        pendingPayoutAggregate._sum?.amount?.toFixed(2) ?? '0.00';
 
     return {
       users: {
@@ -584,8 +588,8 @@ export class StatsService {
         active: activeUsers,
         blocked: blockedUsers,
       },
-      payouts: {
-        pendingCount: pendingPayoutAggregate._count._all ?? 0,
+        payouts: {
+          pendingCount: pendingPayoutAggregate._count ?? 0,
         pendingAmount,
         latest: pendingPayouts.map((payout) => ({
           id: payout.id,
@@ -1028,12 +1032,12 @@ export class StatsService {
   }
 
   private buildOrdersByStatus(
-    groups: { status: OrderStatus; _count: { _all: number } }[],
+    groups: { status: OrderStatus; _count: number }[],
     recontactCount: number,
   ): OrdersByStatusItem[] {
     const map = new Map<OrderStatus, number>();
     for (const group of groups) {
-      map.set(group.status, Number(group._count?._all ?? 0));
+      map.set(group.status, group._count ?? 0);
     }
 
     const getCount = (status: OrderStatus) => map.get(status) ?? 0;
@@ -1170,20 +1174,23 @@ export class StatsService {
   ): Promise<TopPerformer[]> {
     const where: Prisma.OrderWhereInput = {
       ...orderWhere,
-      targetologId: { not: null },
+      targetologId: { not: undefined },
       status: OrderStatus.DELIVERED,
     };
 
-    const grouped = await this.prisma.order.groupBy({
+    const groupedRaw = await this.prisma.order.groupBy({
       by: ['targetologId'],
       where,
-      _count: { _all: true },
+      _count: true,
       _sum: { amount: true },
       orderBy: {
-        _count: { _all: 'desc' },
+        targetologId: 'asc',
       },
-      take: 5,
     });
+
+    const grouped = groupedRaw
+      .sort((a, b) => (b._count ?? 0) - (a._count ?? 0))
+      .slice(0, 5);
 
     const ids = grouped
       .map((item) => item.targetologId)
@@ -1201,7 +1208,8 @@ export class StatsService {
       this.prisma.lead.groupBy({
         by: ['targetologId'],
         where: { targetologId: { in: ids } },
-        _count: { _all: true },
+        _count: true,
+        orderBy: { targetologId: 'asc' },
       }),
     ]);
 
@@ -1212,13 +1220,13 @@ export class StatsService {
       ]),
     );
     const leadMap = new Map(
-      leadCounts.map((item) => [item.targetologId, Number(item._count?._all ?? 0)]),
+      leadCounts.map((item) => [item.targetologId, item._count ?? 0]),
     );
 
     return grouped.map((item) => ({
       id: item.targetologId ?? '',
       name: userMap.get(item.targetologId ?? '') ?? 'Noma’lum targetolog',
-      orders: Number(item._count?._all ?? 0),
+      orders: item._count ?? 0,
       revenue: Number(item._sum?.amount ?? 0),
       leads: leadMap.get(item.targetologId ?? '') ?? 0,
     }));
@@ -1235,8 +1243,11 @@ export class StatsService {
     const grouped = await this.prisma.order.groupBy({
       by: ['productId'],
       where,
-      _count: { _all: true },
+      _count: true,
       _sum: { amount: true },
+      orderBy: {
+        productId: 'asc',
+      },
     });
 
     const productIds = grouped
@@ -1283,7 +1294,7 @@ export class StatsService {
         revenue: 0,
       };
 
-      current.orders += Number(item._count?._all ?? 0);
+        current.orders += item._count ?? 0;
       current.revenue += Number(item._sum?.amount ?? 0);
 
       ownerMap.set(ownerId, current);
@@ -1299,26 +1310,29 @@ export class StatsService {
   ): Promise<TopPerformer[]> {
     const where: Prisma.OrderWhereInput = {
       ...orderWhere,
-      operatorId: { not: null },
+      operatorId: { not: undefined },
       status: {
         in: [
-            OrderStatus.PACKING,
-            OrderStatus.SHIPPED,
+          OrderStatus.PACKING,
+          OrderStatus.SHIPPED,
           OrderStatus.DELIVERED,
           OrderStatus.RETURNED,
         ],
       },
     };
 
-    const grouped = await this.prisma.order.groupBy({
+    const groupedRaw = await this.prisma.order.groupBy({
       by: ['operatorId'],
       where,
-      _count: { _all: true },
+      _count: true,
       orderBy: {
-        _count: { _all: 'desc' },
+        operatorId: 'asc',
       },
-      take: 5,
     });
+
+    const grouped = groupedRaw
+      .sort((a, b) => (b._count ?? 0) - (a._count ?? 0))
+      .slice(0, 5);
 
     const operatorIds = grouped
       .map((item) => item.operatorId)
@@ -1343,7 +1357,7 @@ export class StatsService {
     return grouped.map((item) => ({
       id: item.operatorId ?? '',
       name: operatorMap.get(item.operatorId ?? '') ?? 'Noma’lum operator',
-      orders: Number(item._count?._all ?? 0),
+      orders: item._count ?? 0,
     }));
   }
 

@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 
