@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   LeadStatus,
   NotificationType,
   OrderStatus,
   PayoutStatus,
+  TransactionType,
   UserStatus,
   type Prisma,
 } from '@prisma/client';
@@ -377,6 +378,111 @@ export class StatsService {
       recentActivity,
       quickActions: context.quickActions,
       notifications,
+    };
+  }
+
+  async getPersonalAnalytics(roleSlug: string, userId: string) {
+    if (!userId) {
+      throw new BadRequestException('Foydalanuvchi aniqlanmadi.');
+    }
+
+    const role = (roleSlug ?? '').toUpperCase();
+
+    const flowAggregatePromise =
+      role === 'TARGETOLOG'
+        ? this.prisma.flow.aggregate({
+            _sum: { clicks: true, leads: true, orders: true },
+            where: { ownerId: userId },
+          })
+        : Promise.resolve(null);
+
+    const leadWhere: Prisma.LeadWhereInput =
+      role === 'OPERATOR'
+        ? { operatorId: userId }
+        : { targetologId: userId };
+
+    const orderWhere: Prisma.OrderWhereInput =
+      role === 'OPERATOR'
+        ? { operatorId: userId, status: OrderStatus.DELIVERED }
+        : { targetologId: userId, status: OrderStatus.DELIVERED };
+
+    const [
+      flowAggregate,
+      leadCount,
+      confirmedOrders,
+      revenueAggregate,
+      balanceRow,
+      transactions,
+      flowPerformance,
+    ] = await Promise.all([
+      flowAggregatePromise,
+      this.prisma.lead.count({ where: leadWhere }),
+      this.prisma.order.count({ where: orderWhere }),
+      this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.HOLD_RELEASE,
+        },
+      }),
+      this.prisma.userBalance.findUnique({
+        where: { userId },
+      }),
+      this.prisma.transaction.findMany({
+        where: {
+          userId,
+          type: {
+            in: [
+              TransactionType.HOLD_ADD,
+              TransactionType.HOLD_RELEASE,
+              TransactionType.HOLD_REMOVE,
+              TransactionType.MAIN_ADD,
+              TransactionType.MAIN_REMOVE,
+            ],
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      role === 'TARGETOLOG' ? this.getFlowPerformance(userId) : Promise.resolve([]),
+    ]);
+
+    const clicks =
+      role === 'TARGETOLOG'
+        ? Number(flowAggregate?._sum.clicks ?? 0)
+        : 0;
+
+    const leadsMetric = leadCount;
+    const confirmedOrdersMetric =
+      role === 'TARGETOLOG' || role === 'OPERATOR' ? confirmedOrders : 0;
+    const revenue = Number(revenueAggregate._sum.amount ?? 0);
+
+    const holdDecimal = new Prisma.Decimal(balanceRow?.holdBalance ?? 0);
+    const mainDecimal = new Prisma.Decimal(balanceRow?.mainBalance ?? 0);
+    const totalBalance = holdDecimal.plus(mainDecimal);
+
+    return {
+      role,
+      metrics: {
+        clicks,
+        leads: leadsMetric,
+        confirmedOrders: confirmedOrdersMetric,
+        revenue,
+      },
+      balance: {
+        hold: holdDecimal.toString(),
+        main: mainDecimal.toString(),
+        total: totalBalance.toString(),
+        updatedAt: balanceRow?.updatedAt ?? null,
+      },
+      flowPerformance,
+      transactions: transactions.map((item) => ({
+        id: item.id,
+        type: item.type,
+        amount: item.amount.toString(),
+        createdAt: item.createdAt,
+        meta: item.meta ?? null,
+      })),
     };
   }
 
@@ -818,6 +924,62 @@ export class StatsService {
         color: 'warning',
       },
     ];
+  }
+
+  private async getFlowPerformance(userId: string) {
+    const flows = await this.prisma.flow.findMany({
+      where: { ownerId: userId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        clicks: true,
+        leads: true,
+        orders: true,
+        product: {
+          select: {
+            title: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (flows.length === 0) {
+      return [];
+    }
+
+    const confirmedCounts = await Promise.all(
+      flows.map((flow) =>
+        this.prisma.order.count({
+          where: {
+            status: OrderStatus.DELIVERED,
+            lead: {
+              flowId: flow.id,
+            },
+          },
+        }),
+      ),
+    );
+
+    return flows.map((flow, index) => {
+      const leads = flow.leads ?? 0;
+      const orders = flow.orders ?? 0;
+      const confirmed = confirmedCounts[index] ?? 0;
+      const conversionRate = leads > 0 ? (orders / leads) * 100 : 0;
+
+      return {
+        id: flow.id,
+        title: flow.title,
+        productTitle: flow.product?.title ?? null,
+        clicks: flow.clicks ?? 0,
+        leads,
+        orders,
+        confirmedOrders: confirmed,
+        conversionRate,
+        status: flow.status,
+      };
+    });
   }
 
   private requiresRoleCounts(role: string) {

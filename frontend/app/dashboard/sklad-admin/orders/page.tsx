@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { apiGet, apiPut } from '@/lib/apiClient';
-import { cn } from '@/lib/utils';
 import type { Order, OrderStatus } from '@/types/order';
 
 const statusLabels: Record<OrderStatus, string> = {

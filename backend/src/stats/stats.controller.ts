@@ -20,4 +20,14 @@ export class StatsController {
     const user = req.user as { sub?: string } | undefined;
     return this.statsService.getDashboardStats(role, user?.sub ?? '');
   }
+
+  @Get('me/analytics')
+  @UseGuards(JwtAuthGuard)
+  getPersonalAnalytics(@Req() req: Request) {
+    const user = req.user as { sub?: string; role?: string } | undefined;
+    return this.statsService.getPersonalAnalytics(
+      user?.role ?? '',
+      user?.sub ?? '',
+    );
+  }
 }

@@ -53,8 +53,8 @@ export const ROLE_PERMISSIONS: Record<Role, RolePermission[]> = {
   [Role.TARGETOLOG]: [
     { label: 'Balans', href: '/dashboard/targetolog/payouts', description: 'Balans va payoutlar' },
     { label: 'Oqimlar', href: '/dashboard/targetolog/flows', description: 'Yaratilgan oqimlar' },
-    { label: 'Yangi oqim yaratish', href: '/dashboard/targetolog/flows/new', description: 'Mahsulot uchun yangi oqim yaratish' },
-    { label: 'Ko‘rsatkichlar', href: '/dashboard/targetolog/performance', description: 'Kampaniya samaradorligi' },
+      { label: 'Yangi oqim yaratish', href: '/dashboard/targetolog/flows/new', description: 'Mahsulot uchun yangi oqim yaratish' },
+      { label: 'Ko‘rsatkichlar', href: '/dashboard/targetolog', description: 'Kampaniya samaradorligi' },
     { label: 'Kreativlar', href: '/dashboard/targetolog/creatives', description: 'Banner va matnlar' },
   ],
   [Role.OPERATOR]: [
