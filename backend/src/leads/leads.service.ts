@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
+import { BalancesService } from '@/balances/balances.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -28,6 +29,7 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
+    private readonly balancesService: BalancesService,
   ) {}
 
   async create(dto: CreateLeadDto, context: AuthContext) {
@@ -135,6 +137,12 @@ export class LeadsService {
       where: { id },
       data: { status: dto.status },
     });
+
+    if (dto.status === LeadStatus.TASDIQLANGAN) {
+      await this.balancesService.handleLeadApproved(id, context.userId);
+    } else if (dto.status === LeadStatus.RAD_ETILGAN) {
+      await this.balancesService.handleLeadCancelled(id, context.userId);
+    }
 
     await this.activityService.log({
       userId: context.userId,

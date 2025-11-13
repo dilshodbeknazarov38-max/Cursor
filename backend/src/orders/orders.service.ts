@@ -13,6 +13,7 @@ import {
 } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
+import { BalancesService } from '@/balances/balances.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -48,6 +49,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
+    private readonly balancesService: BalancesService,
   ) {}
 
   async create(dto: CreateOrderDto, context: AuthContext) {
@@ -315,6 +317,7 @@ export class OrdersService {
         where: { id: order.leadId },
         data: { status: LeadStatus.TASDIQLANGAN },
       });
+      await this.balancesService.handleOrderDelivered(id, context.userId);
     }
 
     if (dto.status === OrderStatus.RETURNED && order.leadId) {
@@ -322,6 +325,11 @@ export class OrdersService {
         where: { id: order.leadId },
         data: { status: LeadStatus.RAD_ETILGAN },
       });
+      await this.balancesService.handleLeadCancelled(
+        order.leadId,
+        context.userId,
+      );
+      await this.balancesService.handleOrderReturned(id, context.userId);
     }
 
     await this.notificationsService.create({
