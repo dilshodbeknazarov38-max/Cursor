@@ -486,6 +486,157 @@ export class StatsService {
     };
   }
 
+  async getAdminOverview() {
+    const todayStart = this.startOfDay(new Date());
+    const lowStockThreshold = 5;
+
+    const [
+      totalUsers,
+      activeUsers,
+      blockedUsers,
+      pendingPayoutAggregate,
+      pendingPayouts,
+      packingOrders,
+      shippedOrders,
+      deliveredToday,
+      returnedToday,
+      lowStockCount,
+      lowStockSamples,
+      recentOrders,
+    ] = await this.prisma.$transaction([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
+      this.prisma.user.count({ where: { status: UserStatus.BLOCKED } }),
+      this.prisma.payoutRequest.aggregate({
+        where: { status: PayoutStatus.PENDING },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.payoutRequest.findMany({
+        where: { status: PayoutStatus.PENDING },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              nickname: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+      this.prisma.order.count({ where: { status: OrderStatus.PACKING } }),
+      this.prisma.order.count({ where: { status: OrderStatus.SHIPPED } }),
+      this.prisma.order.count({
+        where: {
+          status: OrderStatus.DELIVERED,
+          deliveredAt: { gte: todayStart },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          status: OrderStatus.RETURNED,
+          returnedAt: { gte: todayStart },
+        },
+      }),
+      this.prisma.product.count({
+        where: {
+          stock: { lte: lowStockThreshold },
+        },
+      }),
+      this.prisma.product.findMany({
+        where: {
+          stock: { lte: lowStockThreshold },
+        },
+        select: {
+          id: true,
+          title: true,
+          stock: true,
+          reservedStock: true,
+        },
+        orderBy: { stock: 'asc' },
+        take: 5,
+      }),
+      this.prisma.order.findMany({
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          product: {
+            select: { id: true, title: true },
+          },
+          targetolog: {
+            select: { id: true, firstName: true, nickname: true },
+          },
+          operator: {
+            select: { id: true, firstName: true, nickname: true },
+          },
+        },
+        take: 10,
+      }),
+    ]);
+
+    const pendingAmount =
+      pendingPayoutAggregate._sum.amount?.toFixed(2) ?? '0.00';
+
+    return {
+      users: {
+        total: totalUsers,
+        active: activeUsers,
+        blocked: blockedUsers,
+      },
+      payouts: {
+        pendingCount: pendingPayoutAggregate._count._all ?? 0,
+        pendingAmount,
+        latest: pendingPayouts.map((payout) => ({
+          id: payout.id,
+          amount: payout.amount.toFixed(2),
+          user: payout.user
+            ? {
+                id: payout.user.id,
+                name: `${payout.user.firstName} (${payout.user.nickname})`,
+              }
+            : null,
+          createdAt: payout.createdAt,
+        })),
+      },
+      orders: {
+        packing: packingOrders,
+        shipped: shippedOrders,
+        deliveredToday,
+        returnedToday,
+      },
+      inventory: {
+        lowStockCount,
+        lowStockSamples: lowStockSamples.map((product) => ({
+          id: product.id,
+          title: product.title,
+          stock: product.stock,
+          reserved: product.reservedStock,
+        })),
+      },
+      recentOrders: recentOrders.map((order) => ({
+        id: order.id,
+        status: order.status,
+        updatedAt: order.updatedAt,
+        product: order.product
+          ? { id: order.product.id, title: order.product.title }
+          : null,
+        targetolog: order.targetolog
+          ? {
+              id: order.targetolog.id,
+              name: `${order.targetolog.firstName} (${order.targetolog.nickname})`,
+            }
+          : null,
+        operator: order.operator
+          ? {
+              id: order.operator.id,
+              name: `${order.operator.firstName ?? ''} (${order.operator.nickname})`,
+            }
+          : null,
+      })),
+    };
+  }
+
   private buildContext(role: string, userId: string): DashboardContext {
     const leadWhere: Prisma.LeadWhereInput = {};
     const orderWhere: Prisma.OrderWhereInput = {};

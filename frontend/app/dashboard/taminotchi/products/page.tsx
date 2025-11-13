@@ -9,7 +9,7 @@ import ProductTable, {
 } from '@/components/ProductTable';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { apiDelete, apiGet } from '@/lib/apiClient';
+import { apiDelete, apiGet, apiPost } from '@/lib/apiClient';
 
 type ApiProduct = {
   id: string;
@@ -18,6 +18,7 @@ type ApiProduct = {
   price: string;
   status: string;
   stock: number;
+  reservedStock?: number;
   updatedAt: string;
   createdAt: string;
 };
@@ -38,6 +39,7 @@ const TaminotchiProductsPage = () => {
         price: product.price,
         status: product.status,
         stock: product.stock,
+        reservedStock: product.reservedStock ?? 0,
         updatedAt: product.updatedAt,
         createdAt: product.createdAt,
       }));
@@ -58,6 +60,60 @@ const TaminotchiProductsPage = () => {
   useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
+
+    const handleAdjustStock = useCallback(
+      async (product: ProductTableRow) => {
+        const input = window.prompt(
+          `"${product.title}" uchun zaxira o‘zgarishini kiriting (masalan, +10 yoki -3):`,
+        );
+        if (!input) {
+          return;
+        }
+        const trimmed = input.trim();
+        const matched = /^([+-]?\d+)$/.exec(trimmed);
+        if (!matched) {
+          toast({
+            title: 'Noto‘g‘ri format',
+            description: 'Faqat butun son kiriting. Masalan: +5 yoki -3.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const value = Number(matched[1]);
+        if (value === 0) {
+          toast({
+            title: 'Ma’lumot kiritilmadi',
+            description: '0 ga teng o‘zgarish kiritilmaydi.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        const type: 'increase' | 'decrease' = value > 0 ? 'increase' : 'decrease';
+        const payload = {
+          productId: product.id,
+          type,
+          quantity: Math.abs(value),
+          reason: 'Taminotchi tomonidan zaxira yangilandi',
+        };
+        try {
+          await apiPost('/warehouse/adjust', payload);
+          toast({
+            title: 'Zaxira yangilandi',
+            description: `"${product.title}" uchun zaxira muvaffaqiyatli o‘zgartirildi.`,
+          });
+          await loadProducts();
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Zaxirani o‘zgartirishda xatolik.';
+          toast({
+            title: 'Xatolik',
+            description: message,
+            variant: 'destructive',
+          });
+        }
+      },
+      [loadProducts, toast],
+    );
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -117,6 +173,14 @@ const TaminotchiProductsPage = () => {
           emptyMessage="Hozircha mahsulot qo‘shilmagan. Boshlash uchun “Yangi mahsulot” tugmasini bosing."
           renderActions={(product) => (
             <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => handleAdjustStock(product)}
+                >
+                  Zaxira
+                </Button>
               <Button
                 asChild
                 variant="outline"

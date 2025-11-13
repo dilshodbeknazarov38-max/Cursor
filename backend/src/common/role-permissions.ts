@@ -38,6 +38,7 @@ export const ROLE_PERMISSIONS: Record<Role, RolePermission[]> = {
   ],
   [Role.SKLAD_ADMIN]: [
     { label: 'Balans', href: '/dashboard/sklad-admin/payouts', description: 'Balans va payoutlar' },
+    { label: 'Ombor', href: '/dashboard/sklad-admin/inventory', description: 'Zaxira va rezerv holati' },
     { label: 'Tasdiqlash kutilayotgan mahsulotlar', href: '/dashboard/sklad-admin/products', description: 'Yangi mahsulotlarni ko‘rib chiqish' },
     { label: 'Barcha mahsulotlar', href: '/dashboard/sklad-admin/products/all', description: 'Tasdiqlangan mahsulotlar ro‘yxati' },
     { label: 'Jo‘natmalar', href: '/dashboard/sklad-admin/shipments', description: 'Logistika holati' },

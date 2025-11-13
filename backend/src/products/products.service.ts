@@ -154,34 +154,45 @@ export class ProductsService {
     if (product.ownerId !== context.userId) {
       throw new ForbiddenException('Faqat o‘z mahsulotingizni tahrirlashingiz mumkin.');
     }
-    if (product.status !== ProductStatus.PENDING) {
-      throw new BadRequestException(
-        'Faqat kutilayotgan (PENDING) mahsulotni tahrirlash mumkin.',
-      );
-    }
-
     const data: Prisma.ProductUpdateInput = {};
 
+    const markPending =
+      product.status === ProductStatus.APPROVED ||
+      product.status === ProductStatus.REJECTED;
+
     if (dto.title !== undefined) {
+      if (product.status !== ProductStatus.PENDING) {
+        throw new BadRequestException(
+          'Tasdiqlangan mahsulot nomini o‘zgartirib bo‘lmaydi.',
+        );
+      }
       data.title = dto.title.trim();
     }
     if (dto.description !== undefined) {
       data.description = dto.description.trim();
+      if (markPending) {
+        data.status = ProductStatus.PENDING;
+      }
     }
     if (dto.price !== undefined) {
       if (dto.price <= 0) {
         throw new BadRequestException('Narx musbat son bo‘lishi kerak.');
       }
       data.price = new Prisma.Decimal(dto.price);
+      if (markPending) {
+        data.status = ProductStatus.PENDING;
+      }
     }
     if (dto.images !== undefined) {
       data.images = this.normalizeImages(dto.images);
+      if (markPending) {
+        data.status = ProductStatus.PENDING;
+      }
     }
     if (dto.stock !== undefined) {
-      if (dto.stock < 0) {
-        throw new BadRequestException('Soni 0 dan kichik bo‘lishi mumkin emas.');
-      }
-      data.stock = dto.stock;
+      throw new BadRequestException(
+        'Zaxirani alohida “Ombor” bo‘limida boshqaring.',
+      );
     }
 
     const updated = await this.prisma.product.update({
@@ -296,24 +307,26 @@ export class ProductsService {
       .slice(0, 10);
   }
 
-  private toProductResponse(product: {
-    id: string;
-    createdAt: Date;
-    updatedAt: Date;
-    title: string;
-    description: string;
-    price: Prisma.Decimal | number;
-    images: string[];
-    stock: number;
-    status: ProductStatus;
-    ownerId: string;
-    owner?: {
+  private toProductResponse(
+    product: {
       id: string;
-      firstName: string | null;
-      lastName: string | null;
-      nickname: string;
-      phone: string;
-    } | null;
+      createdAt: Date;
+      updatedAt: Date;
+      title: string;
+      description: string;
+      price: Prisma.Decimal | number;
+      images: string[];
+      stock: number;
+      reservedStock?: number;
+      status: ProductStatus;
+      ownerId: string;
+      owner?: {
+        id: string;
+        firstName: string | null;
+        lastName: string | null;
+        nickname: string;
+        phone: string;
+      } | null;
       flows?: Array<{
         id: string;
         title: string;
@@ -328,7 +341,8 @@ export class ProductsService {
         ownerId: string;
         productId: string;
       }>;
-    }) {
+    },
+  ) {
       const publicBase =
         this.configService.get<string>('app.publicUrl') ?? 'http://localhost:3001';
       const cleanBase = publicBase.replace(/\/$/, '');
@@ -337,6 +351,7 @@ export class ProductsService {
         ...product,
         price: new Prisma.Decimal(product.price).toFixed(2),
         owner: product.owner ?? undefined,
+      reservedStock: product.reservedStock ?? 0,
         flows: product.flows
           ? product.flows.map((flow) => ({
               ...flow,

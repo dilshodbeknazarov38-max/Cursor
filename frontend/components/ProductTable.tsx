@@ -11,6 +11,7 @@ type ProductTableRow = {
   price: string;
   status: string;
   stock: number;
+  reservedStock?: number;
   updatedAt: string;
   createdAt: string;
 };
@@ -58,7 +59,8 @@ const ProductTable = ({
             <th className="px-4 py-3 text-left">Mahsulot</th>
             <th className="px-4 py-3 text-left">Narx</th>
             <th className="px-4 py-3 text-left">Status</th>
-            <th className="px-4 py-3 text-left">Soni</th>
+            <th className="px-4 py-3 text-left">Zaxira</th>
+            <th className="px-4 py-3 text-left">Rezerv</th>
             <th className="px-4 py-3 text-left">Yangilangan</th>
             {renderActions ? <th className="px-4 py-3 text-right">Amallar</th> : null}
           </tr>
@@ -76,24 +78,27 @@ const ProductTable = ({
                   ) : null}
                 </div>
               </td>
-              <td className="px-4 py-3 font-medium text-slate-800">
-                {new Intl.NumberFormat('uz-UZ', {
-                  style: 'currency',
-                  currency: 'UZS',
-                  maximumFractionDigits: 0,
-                }).format(Number(product.price))}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={cn(
-                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide',
-                    statusClasses[product.status] ?? 'bg-slate-100 text-slate-600',
-                  )}
-                >
-                  {product.status}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-slate-700">{product.stock}</td>
+                <td className="px-4 py-3 font-medium text-slate-800">
+                  {new Intl.NumberFormat('uz-UZ', {
+                    style: 'currency',
+                    currency: 'UZS',
+                    maximumFractionDigits: 0,
+                  }).format(Number(product.price))}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide',
+                      statusClasses[product.status] ?? 'bg-slate-100 text-slate-600',
+                    )}
+                  >
+                    {product.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-slate-700">{product.stock}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {product.reservedStock ?? 0}
+                </td>
               <td className="px-4 py-3 text-slate-500">
                 {new Intl.DateTimeFormat('uz-UZ', {
                   year: 'numeric',

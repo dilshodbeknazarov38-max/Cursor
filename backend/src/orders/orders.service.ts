@@ -15,7 +15,9 @@ import {
 import { ActivityService } from '@/activity/activity.service';
 import { BalanceService } from '@/balance/balance.service';
 import { NotificationsService } from '@/notifications/notifications.service';
+import { TelegramService } from '@/notifications/telegram.service';
 import { PrismaService } from '@/prisma/prisma.service';
+import { WarehouseService } from '@/warehouse/warehouse.service';
 
 import { AssignOperatorDto } from './dto/assign-operator.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -32,6 +34,8 @@ export class OrdersService {
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
     private readonly balanceService: BalanceService,
+    private readonly warehouseService: WarehouseService,
+    private readonly telegramService: TelegramService,
   ) {}
 
   async create(dto: CreateOrderDto, context: AuthContext) {
@@ -227,28 +231,56 @@ export class OrdersService {
   async packOrder(id: string, context: AuthContext) {
     this.ensureSkladPermission(context.role);
 
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-    });
-    if (!order) {
-      throw new NotFoundException('Buyurtma topilmadi.');
-    }
-    if (order.status !== OrderStatus.PACKING) {
-      throw new BadRequestException('Buyurtma qadoqlash holatida emas.');
-    }
+    await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          packedAt: true,
+          productId: true,
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
 
-    const updated = await this.prisma.order.update({
+      if (!order) {
+        throw new NotFoundException('Buyurtma topilmadi.');
+      }
+      if (order.status !== OrderStatus.PACKING) {
+        throw new BadRequestException('Buyurtma qadoqlash holatida emas.');
+      }
+
+      if (!order.packedAt) {
+        await this.warehouseService.reserveProduct(
+          order.productId,
+          1,
+          order.id,
+          context.userId,
+          tx,
+        );
+      }
+
+      await tx.order.update({
+        where: { id },
+        data: {
+          packedAt: order.packedAt ?? new Date(),
+        },
+      });
+    });
+
+    const updated = await this.prisma.order.findUnique({
       where: { id },
-      data: {
-        packedAt: order.packedAt ?? new Date(),
-      },
-      include: this.orderRelations(),
+      include: this.orderRelations(true),
     });
 
     await this.activityService.log({
       userId: context.userId,
       action: 'Buyurtma qadoqlanishi tasdiqlandi.',
-      meta: { orderId: updated.id },
+      meta: { orderId: updated?.id ?? id },
     });
 
     return {
@@ -260,26 +292,50 @@ export class OrdersService {
   async shipOrder(id: string, context: AuthContext) {
     this.ensureSkladPermission(context.role);
 
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-    });
-    if (!order) {
-      throw new NotFoundException('Buyurtma topilmadi.');
-    }
-    if (order.status !== OrderStatus.PACKING) {
-      throw new BadRequestException('Buyurtma jo‘natish uchun tayyor emas.');
-    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          status: true,
+          packedAt: true,
+          productId: true,
+          product: {
+            select: {
+              title: true,
+            },
+          },
+        },
+      });
 
-    const shipTime = new Date();
+      if (!current) {
+        throw new NotFoundException('Buyurtma topilmadi.');
+      }
+      if (current.status !== OrderStatus.PACKING) {
+        throw new BadRequestException('Buyurtma jo‘natish uchun tayyor emas.');
+      }
 
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: {
-        status: OrderStatus.SHIPPED,
-        packedAt: order.packedAt ?? shipTime,
-        shippedAt: shipTime,
-      },
-      include: this.orderRelations(),
+      const now = new Date();
+
+      if (!current.packedAt) {
+        await this.warehouseService.reserveProduct(
+          current.productId,
+          1,
+          current.id,
+          context.userId,
+          tx,
+        );
+      }
+
+      return tx.order.update({
+        where: { id },
+        data: {
+          status: OrderStatus.SHIPPED,
+          packedAt: current.packedAt ?? now,
+          shippedAt: now,
+        },
+        include: this.orderRelations(true),
+      });
     });
 
     await this.activityService.log({
@@ -289,6 +345,9 @@ export class OrdersService {
     });
 
     await this.notifyTargetAndOperator(updated, 'Buyurtma jo‘natildi.');
+    await this.notifyTelegram(
+      `📦 Buyurtma *${updated.id}* jo‘natildi. Mahsulot: *${updated.product.title}*.`,
+    );
 
     return {
       message: 'Buyurtma jo‘natildi.',
@@ -299,31 +358,40 @@ export class OrdersService {
   async deliverOrder(id: string, context: AuthContext) {
     this.ensureSkladPermission(context.role);
 
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        product: true,
-        lead: true,
-      },
-    });
-    if (!order) {
-      throw new NotFoundException('Buyurtma topilmadi.');
-    }
-    if (order.status !== OrderStatus.SHIPPED) {
-      throw new BadRequestException('Buyurtma yetkazib berish holatida emas.');
-    }
+    const delivered = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        include: {
+          product: true,
+          lead: true,
+        },
+      });
 
-    const targetReward = order.product?.cpaTargetolog
-      ? new Prisma.Decimal(order.product.cpaTargetolog)
-      : null;
-    const operatorReward =
-      order.product?.cpaOperator && order.operatorId
-        ? new Prisma.Decimal(order.product.cpaOperator)
+      if (!current) {
+        throw new NotFoundException('Buyurtma topilmadi.');
+      }
+      if (current.status !== OrderStatus.SHIPPED) {
+        throw new BadRequestException('Buyurtma yetkazib berish holatida emas.');
+      }
+
+      const targetReward = current.product?.cpaTargetolog
+        ? new Prisma.Decimal(current.product.cpaTargetolog)
         : null;
+      const operatorReward =
+        current.product?.cpaOperator && current.operatorId
+          ? new Prisma.Decimal(current.product.cpaOperator)
+          : null;
 
-    const deliveredAt = new Date();
+      const deliveredAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+      await this.warehouseService.commitReservation(
+        current.productId,
+        1,
+        current.id,
+        context.userId,
+        tx,
+      );
+
       await tx.order.update({
         where: { id },
         data: {
@@ -332,42 +400,42 @@ export class OrdersService {
         },
       });
 
-      if (order.leadId && order.lead?.status !== LeadStatus.CONFIRMED) {
+      if (current.leadId && current.lead?.status !== LeadStatus.CONFIRMED) {
         await tx.lead.update({
-          where: { id: order.leadId },
+          where: { id: current.leadId },
           data: { status: LeadStatus.CONFIRMED },
         });
       }
 
       if (targetReward && targetReward.gt(0)) {
         await this.balanceService.releaseHoldToMain(
-          order.targetologId,
+          current.targetologId,
           targetReward,
           {
             orderId: id,
-            leadId: order.leadId,
+            leadId: current.leadId,
           },
           tx,
         );
       }
 
-      if (operatorReward && operatorReward.gt(0) && order.operatorId) {
+      if (operatorReward && operatorReward.gt(0) && current.operatorId) {
         await this.balanceService.releaseHoldToMain(
-          order.operatorId,
+          current.operatorId,
           operatorReward,
           {
             orderId: id,
-            leadId: order.leadId,
+            leadId: current.leadId,
             role: 'OPERATOR',
           },
           tx,
         );
       }
-    });
 
-    const updated = await this.prisma.order.findUnique({
-      where: { id },
-      include: this.orderRelations(),
+      return tx.order.findUnique({
+        where: { id },
+        include: this.orderRelations(true),
+      });
     });
 
     await this.activityService.log({
@@ -376,47 +444,63 @@ export class OrdersService {
       meta: { orderId: id },
     });
 
-    await this.notifyTargetAndOperator(updated!, 'Buyurtma yetkazib berildi.');
+    if (delivered) {
+      await this.notifyTargetAndOperator(delivered, 'Buyurtma yetkazib berildi.');
+      await this.notifyTelegram(
+        `✅ Buyurtma *${delivered.id}* yetkazib berildi. Mahsulot: *${delivered.product.title}*.`,
+      );
+    }
 
     return {
       message: 'Buyurtma muvaffaqiyatli yetkazildi.',
-      order: updated,
+      order: delivered,
     };
   }
 
   async returnOrder(id: string, context: AuthContext) {
     this.ensureSkladPermission(context.role);
 
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        product: true,
-        lead: true,
-      },
-    });
-    if (!order) {
-      throw new NotFoundException('Buyurtma topilmadi.');
-    }
-    if (
-      order.status !== OrderStatus.PACKING &&
-      order.status !== OrderStatus.SHIPPED
-    ) {
-      throw new BadRequestException(
-        'Buyurtmani qaytarish faqat qadoqlash yoki jo‘natish bosqichida mumkin.',
-      );
-    }
+    const returned = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.order.findUnique({
+        where: { id },
+        include: {
+          product: true,
+          lead: true,
+        },
+      });
 
-    const targetReward = order.product?.cpaTargetolog
-      ? new Prisma.Decimal(order.product.cpaTargetolog)
-      : null;
-    const operatorReward =
-      order.product?.cpaOperator && order.operatorId
-        ? new Prisma.Decimal(order.product.cpaOperator)
+      if (!current) {
+        throw new NotFoundException('Buyurtma topilmadi.');
+      }
+      if (
+        current.status !== OrderStatus.PACKING &&
+        current.status !== OrderStatus.SHIPPED
+      ) {
+        throw new BadRequestException(
+          'Buyurtmani qaytarish faqat qadoqlash yoki jo‘natish bosqichida mumkin.',
+        );
+      }
+
+      const targetReward = current.product?.cpaTargetolog
+        ? new Prisma.Decimal(current.product.cpaTargetolog)
         : null;
+      const operatorReward =
+        current.product?.cpaOperator && current.operatorId
+          ? new Prisma.Decimal(current.product.cpaOperator)
+          : null;
 
-    const returnedAt = new Date();
+      const returnedAt = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+      if (current.packedAt) {
+        await this.warehouseService.releaseReservation(
+          current.productId,
+          1,
+          current.id,
+          context.userId,
+          tx,
+        );
+      }
+
       await tx.order.update({
         where: { id },
         data: {
@@ -425,44 +509,44 @@ export class OrdersService {
         },
       });
 
-      if (order.leadId && order.lead?.status !== LeadStatus.CANCELLED) {
+      if (current.leadId && current.lead?.status !== LeadStatus.CANCELLED) {
         await tx.lead.update({
-          where: { id: order.leadId },
+          where: { id: current.leadId },
           data: { status: LeadStatus.CANCELLED },
         });
       }
 
       if (targetReward && targetReward.gt(0)) {
         await this.balanceService.removeHold(
-          order.targetologId,
+          current.targetologId,
           targetReward,
           {
             orderId: id,
-            leadId: order.leadId,
+            leadId: current.leadId,
             reason: 'ORDER_RETURNED',
           },
           tx,
         );
       }
 
-      if (operatorReward && operatorReward.gt(0) && order.operatorId) {
+      if (operatorReward && operatorReward.gt(0) && current.operatorId) {
         await this.balanceService.removeHold(
-          order.operatorId,
+          current.operatorId,
           operatorReward,
           {
             orderId: id,
-            leadId: order.leadId,
+            leadId: current.leadId,
             role: 'OPERATOR',
             reason: 'ORDER_RETURNED',
           },
           tx,
         );
       }
-    });
 
-    const updated = await this.prisma.order.findUnique({
-      where: { id },
-      include: this.orderRelations(),
+      return tx.order.findUnique({
+        where: { id },
+        include: this.orderRelations(true),
+      });
     });
 
     await this.activityService.log({
@@ -471,11 +555,16 @@ export class OrdersService {
       meta: { orderId: id },
     });
 
-    await this.notifyTargetAndOperator(updated!, 'Buyurtma qaytarildi.');
+    if (returned) {
+      await this.notifyTargetAndOperator(returned, 'Buyurtma qaytarildi.');
+      await this.notifyTelegram(
+        `↩️ Buyurtma *${returned.id}* qaytarildi. Mahsulot: *${returned.product.title}*.`,
+      );
+    }
 
     return {
       message: 'Buyurtma qaytarildi va hold balansdan olib tashlandi.',
-      order: updated,
+      order: returned,
     };
   }
 
@@ -538,6 +627,10 @@ export class OrdersService {
         metadata: { orderId: order.id },
       });
     }
+  }
+
+  private async notifyTelegram(message: string) {
+    await this.telegramService.sendMessage(message);
   }
 
   private ensureCreatePermission(role: string) {

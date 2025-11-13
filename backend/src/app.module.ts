@@ -22,6 +22,7 @@ import { StatsModule } from '@/stats/stats.module';
 import { TransactionsModule } from '@/transactions/transactions.module';
 import { UsersModule } from '@/users/users.module';
 import { FlowsModule } from '@/flows/flows.module';
+import { WarehouseModule } from '@/warehouse/warehouse.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -54,8 +55,9 @@ import { AppService } from './app.service';
       PayoutModule,
       ActivityModule,
       BalancesModule,
-      TransactionsModule,
+        TransactionsModule,
       FlowsModule,
+        WarehouseModule,
   ],
   controllers: [AppController],
   providers: [
