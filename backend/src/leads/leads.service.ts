@@ -341,6 +341,40 @@ export class LeadsService {
         },
       });
 
+      if (lead.product?.cpaTargetolog) {
+        const targetReward = new Prisma.Decimal(lead.product.cpaTargetolog);
+        if (targetReward.gt(0)) {
+          await this.balanceService.addHoldBalance(
+            lead.targetologId,
+            targetReward,
+            {
+              leadId: lead.id,
+              orderId: order.id,
+              flowId: lead.flowId,
+              role: 'TARGETOLOG',
+            },
+            tx,
+          );
+        }
+      }
+
+      if (lead.product?.cpaOperator && lead.operatorId) {
+        const operatorReward = new Prisma.Decimal(lead.product.cpaOperator);
+        if (operatorReward.gt(0)) {
+          await this.balanceService.addHoldBalance(
+            lead.operatorId,
+            operatorReward,
+            {
+              leadId: lead.id,
+              orderId: order.id,
+              flowId: lead.flowId,
+              role: 'OPERATOR',
+            },
+            tx,
+          );
+        }
+      }
+
       await tx.flow.update({
         where: { id: lead.flowId },
         data: {
@@ -370,8 +404,6 @@ export class LeadsService {
       },
     });
 
-    await this.applyHoldBalances(result.updatedLead, result.order);
-
     return {
       lead: this.mapLeadResponse(result.updatedLead),
       order: {
@@ -395,47 +427,6 @@ export class LeadsService {
       throw new ForbiddenException('Lead sizga biriktirilmagan.');
     }
     return lead;
-  }
-
-  private async applyHoldBalances(
-    lead: LeadWithRelations,
-    order: {
-      id: string;
-      product: {
-        cpaTargetolog: Prisma.Decimal | null;
-        cpaOperator: Prisma.Decimal | null;
-      };
-    },
-  ) {
-    if (!lead?.product) {
-      return;
-    }
-
-    const targetologReward = order.product.cpaTargetolog
-      ? new Prisma.Decimal(order.product.cpaTargetolog)
-      : null;
-    if (targetologReward && targetologReward.gt(0)) {
-      await this.balanceService.addHoldBalance(lead.targetologId, targetologReward, {
-        leadId: lead.id,
-        orderId: order.id,
-        flowId: lead.flowId,
-        role: 'TARGETOLOG',
-      });
-    }
-
-    if (lead.operatorId) {
-      const operatorReward = order.product.cpaOperator
-        ? new Prisma.Decimal(order.product.cpaOperator)
-        : null;
-      if (operatorReward && operatorReward.gt(0)) {
-        await this.balanceService.addHoldBalance(lead.operatorId, operatorReward, {
-          leadId: lead.id,
-          orderId: order.id,
-          flowId: lead.flowId,
-          role: 'OPERATOR',
-        });
-      }
-    }
   }
 
   private leadRelations() {
