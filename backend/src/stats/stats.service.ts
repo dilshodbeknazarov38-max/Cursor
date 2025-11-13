@@ -462,10 +462,10 @@ export class StatsService {
         );
         break;
       case 'TAMINOTCHI':
-        if (hasUser) {
-          orderWhere.product = {
-            sellerId: userId,
-          };
+          if (hasUser) {
+            orderWhere.product = {
+              ownerId: userId,
+            };
           payoutWhere.userId = userId;
           activityWhere.userId = userId;
           notificationWhere.OR = [
@@ -953,8 +953,8 @@ export class StatsService {
       where: { id: { in: productIds } },
       select: {
         id: true,
-        sellerId: true,
-        seller: {
+        ownerId: true,
+        owner: {
           select: {
             id: true,
             firstName: true,
@@ -965,7 +965,7 @@ export class StatsService {
     });
 
     const productMap = new Map(products.map((item) => [item.id, item]));
-    const sellerMap = new Map<
+    const ownerMap = new Map<
       string,
       { id: string; name: string; orders: number; revenue: number }
     >();
@@ -974,13 +974,13 @@ export class StatsService {
       const product = item.productId
         ? productMap.get(item.productId)
         : undefined;
-      if (!product?.seller) {
+      if (!product?.owner) {
         continue;
       }
-      const sellerId = product.seller.id;
-      const current = sellerMap.get(sellerId) ?? {
-        id: sellerId,
-        name: `${product.seller.firstName} (${product.seller.nickname})`,
+      const ownerId = product.owner.id;
+      const current = ownerMap.get(ownerId) ?? {
+        id: ownerId,
+        name: `${product.owner.firstName} (${product.owner.nickname})`,
         orders: 0,
         revenue: 0,
       };
@@ -988,10 +988,10 @@ export class StatsService {
       current.orders += Number(item._count?._all ?? 0);
       current.revenue += Number(item._sum?.amount ?? 0);
 
-      sellerMap.set(sellerId, current);
+      ownerMap.set(ownerId, current);
     }
 
-    return Array.from(sellerMap.values())
+    return Array.from(ownerMap.values())
       .sort((a, b) => b.orders - a.orders)
       .slice(0, 5);
   }

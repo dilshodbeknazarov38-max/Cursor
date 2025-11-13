@@ -109,3 +109,8 @@ export const apiPut = <T = unknown, TBody = unknown>(
   body?: TBody,
   options?: Omit<ApiClientOptions, 'method' | 'body'>,
 ) => apiClient<T>(path, { ...options, method: 'PUT', body });
+
+export const apiDelete = <T = unknown>(
+  path: string,
+  options?: Omit<ApiClientOptions, 'method' | 'body'>,
+) => apiClient<T>(path, { ...options, method: 'DELETE' });

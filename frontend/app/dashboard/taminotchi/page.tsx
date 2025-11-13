@@ -1,20 +1,46 @@
+import Link from 'next/link';
+
 import DashboardLayout from '@/components/DashboardLayout';
-import ProductForm from '@/components/ProductForm';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const TaminotchiDashboardPage = () => {
   return (
     <DashboardLayout role="taminotchi">
-      <div className="space-y-8">
-        <header>
-          <h2 className="text-2xl font-semibold text-slate-900">Taminotchi Dashboard</h2>
-          <p className="mt-2 text-sm text-slate-500">Mahsulotlar ro‘yxati, yetkazib berish holati va balans nazorati.</p>
-        </header>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Mahsulotlar</CardTitle>
+            <CardDescription>
+              Yangi mahsulot qo‘shing yoki mavjud mahsulotlaringizni tahrirlang. Tasdiqlash jarayonini kuzatib boring.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild>
+              <Link href="/dashboard/taminotchi/products/new">Yangi mahsulot</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/taminotchi/products">Mahsulotlar ro‘yxati</Link>
+            </Button>
+          </CardContent>
+        </Card>
 
-        <ProductForm />
-
-        <div className="rounded-xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
-          Yaratilgan mahsulotlar avtomatik ravishda inventar ro‘yxatiga qo‘shiladi.
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Oqim va buyurtmalar</CardTitle>
+            <CardDescription>
+              Tasdiqlangan mahsulotlaringiz oqimlari va buyurtmalarining holatini kuzatib boring.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild variant="outline">
+              <Link href="/dashboard/taminotchi/orders">Buyurtmalarim</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/taminotchi/payments">Hisob-kitoblar</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

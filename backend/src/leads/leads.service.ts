@@ -40,7 +40,7 @@ export class LeadsService {
     const product = await this.prisma.product.findFirst({
       where: {
         id: dto.productId,
-        status: { notIn: [ProductStatus.ARCHIVED, ProductStatus.INACTIVE] },
+        status: ProductStatus.APPROVED,
       },
     });
     if (!product) {
@@ -83,10 +83,10 @@ export class LeadsService {
       targetologId,
       context.ip ?? null,
     );
-    await this.notifyTargetAdmin(
-      `Yangi lead yaratildi: ${lead.product.name}`,
-      lead.targetologId,
-    );
+      await this.notifyTargetAdmin(
+        `Yangi lead yaratildi: ${lead.product.title}`,
+        lead.targetologId,
+      );
 
     return {
       message: 'Lead muvaffaqiyatli yaratildi.',

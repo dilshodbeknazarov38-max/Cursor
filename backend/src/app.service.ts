@@ -306,27 +306,28 @@ export class AppService implements OnModuleInit {
       },
     });
 
-    const productSlug = `demo-product-${supplierUser.id.slice(0, 8)}`;
-    const product = await this.prisma.product.upsert({
-      where: { slug: productSlug },
-      update: {},
-      create: {
-        name: 'Demo mahsulot',
-        slug: productSlug,
-        category: 'Demo',
-        shortDescription: 'Demo mahsulot uchun qisqa tavsif.',
-        fullDescription: 'Demo mahsulotning to‘liq tavsifi.',
-        price: new Prisma.Decimal('350000'),
-        cpaTargetolog: new Prisma.Decimal('150000'),
-        cpaOperator: new Prisma.Decimal('80000'),
-        mainImageUrl: '/static/placeholders/product.png',
-        smartLinkUrl: 'https://example.com/demo-product',
-        status: ProductStatus.ACTIVE,
-        sellerId: supplierUser.id,
-        tags: ['demo', 'mahsulot'],
-        trafficSources: ['facebook', 'instagram'],
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        ownerId: supplierUser.id,
+        title: 'Demo mahsulot',
       },
     });
+
+    const product =
+      existingProduct ??
+      (await this.prisma.product.create({
+        data: {
+          title: 'Demo mahsulot',
+          description: 'Demo mahsulotning to‘liq tavsifi.',
+          price: new Prisma.Decimal('350000'),
+          cpaTargetolog: new Prisma.Decimal('150000'),
+          cpaOperator: new Prisma.Decimal('80000'),
+          images: ['/static/placeholders/product.png'],
+          stock: 100,
+          status: ProductStatus.APPROVED,
+          ownerId: supplierUser.id,
+        },
+      }));
 
     const lead = await this.prisma.lead.create({
       data: {

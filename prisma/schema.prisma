@@ -21,11 +21,9 @@ enum UserStatus {
 }
 
 enum ProductStatus {
-  DRAFT
-  ACTIVE
-  INACTIVE
-  ARCHIVED
-  PENDING_APPROVAL
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum LeadStatus {
@@ -123,7 +121,8 @@ model User {
   role             Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
   refreshTokens    RefreshToken[]
   resetTokens      PasswordResetToken[]
-  products         Product[]            @relation("ProductSeller")
+  products         Product[]            @relation("ProductOwner")
+  flows            Flow[]               @relation("FlowOwner")
   leads            Lead[]               @relation("LeadTargetolog")
   ordersAsTarget   Order[]              @relation("OrderTargetolog")
   ordersAsOperator Order[]              @relation("OrderOperator")
@@ -173,34 +172,41 @@ model RolePermission {
 }
 
 model Product {
-  id               String        @id @default(uuid())
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  name             String
-  slug             String        @unique
-  category         String
-  shortDescription String
-  fullDescription  String?
-  price            Decimal       @db.Decimal(12, 2)
-  cpaTargetolog    Decimal?      @db.Decimal(12, 2)
-  cpaOperator      Decimal?      @db.Decimal(12, 2)
-  mainImageUrl     String
-  creativeUrl      String?
-  seoTitle         String?
-  seoDescription   String?
-  tags             String[]
-  trafficSources   String[]
-  smartLinkUrl     String?
-  marketplaceId    String?
-  externalUrl      String?
-  status           ProductStatus @default(PENDING_APPROVAL)
-  sellerId         String
-  seller           User          @relation("ProductSeller", fields: [sellerId], references: [id], onDelete: Restrict)
-  leads            Lead[]
-  orders           Order[]
+  id          String         @id @default(uuid())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  title       String
+  description String
+  price       Decimal        @db.Decimal(12, 2)
+  cpaTargetolog Decimal?     @db.Decimal(12, 2)
+  cpaOperator  Decimal?      @db.Decimal(12, 2)
+  images      String[]       @default([])
+  stock       Int            @default(0)
+  status      ProductStatus  @default(PENDING)
+  ownerId     String
+  owner       User           @relation("ProductOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  flows       Flow[]
+  leads       Lead[]
+  orders      Order[]
 
-  @@index([sellerId])
+  @@index([ownerId])
   @@index([status])
+}
+
+model Flow {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  title     String
+  urlSlug   String   @unique
+  isActive  Boolean  @default(true)
+  productId String
+  ownerId   String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  owner     User     @relation("FlowOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([ownerId])
 }
 
 model BalanceAccount {

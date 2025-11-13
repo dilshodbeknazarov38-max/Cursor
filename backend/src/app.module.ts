@@ -21,6 +21,7 @@ import { RolesModule } from '@/roles/roles.module';
 import { StatsModule } from '@/stats/stats.module';
 import { TransactionsModule } from '@/transactions/transactions.module';
 import { UsersModule } from '@/users/users.module';
+import { FlowsModule } from '@/flows/flows.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -32,28 +33,29 @@ import { AppService } from './app.service';
       validate,
       load: [APP_CONFIG],
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60,
-        limit: 120,
-      },
-    ]),
-    PrismaModule,
-    BalanceModule,
-    UsersModule,
-    RolesModule,
-    StatsModule,
-    PermissionsModule,
-    AuthModule,
-    ProductsModule,
-    LeadsModule,
-    OrdersModule,
-    PayoutsModule,
-    NotificationsModule,
-    PayoutModule,
-    ActivityModule,
-    BalancesModule,
-    TransactionsModule,
+      ThrottlerModule.forRoot([
+        {
+          ttl: 60,
+          limit: 120,
+        },
+      ]),
+      PrismaModule,
+      BalanceModule,
+      UsersModule,
+      RolesModule,
+      StatsModule,
+      PermissionsModule,
+      AuthModule,
+      ProductsModule,
+      LeadsModule,
+      OrdersModule,
+      PayoutsModule,
+      NotificationsModule,
+      PayoutModule,
+      ActivityModule,
+      BalancesModule,
+      TransactionsModule,
+      FlowsModule,
   ],
   controllers: [AppController],
   providers: [

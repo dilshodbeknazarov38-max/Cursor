@@ -58,7 +58,7 @@ export class OrdersService {
     const product = await this.prisma.product.findFirst({
       where: {
         id: dto.productId,
-        status: { not: ProductStatus.ARCHIVED },
+        status: ProductStatus.APPROVED,
       },
     });
     if (!product) {
@@ -140,12 +140,12 @@ export class OrdersService {
       },
     });
 
-    await this.notificationsService.create({
-      toUserId: order.targetologId,
-      message: `Mahsulot bo‘yicha yangi buyurtma yaratildi: ${order.product.name}`,
-      type: NotificationType.ORDER,
-      metadata: { orderId: order.id },
-    });
+      await this.notificationsService.create({
+        toUserId: order.targetologId,
+        message: `Mahsulot bo‘yicha yangi buyurtma yaratildi: ${order.product.title}`,
+        type: NotificationType.ORDER,
+        metadata: { orderId: order.id },
+      });
 
     if (order.operatorId) {
       await this.notificationsService.create({
@@ -172,12 +172,12 @@ export class OrdersService {
       where.targetologId = context.userId;
     } else if (context.role === 'OPERATOR') {
       where.operatorId = context.userId;
-    } else if (context.role === 'TAMINOTCHI') {
-      where.product = {
-        is: {
-          sellerId: context.userId,
-        },
-      };
+      } else if (context.role === 'TAMINOTCHI') {
+        where.product = {
+          is: {
+            ownerId: context.userId,
+          },
+        };
     } else if (context.role === 'SKLAD_ADMIN') {
       where.status = OrderStatus.IN_DELIVERY;
     }
@@ -256,7 +256,7 @@ export class OrdersService {
 
     await this.notificationsService.create({
       toUserId: operator.id,
-      message: `Sizga yangi buyurtma biriktirildi: ${updated.product.name}`,
+      message: `Sizga yangi buyurtma biriktirildi: ${updated.product.title}`,
       type: NotificationType.ORDER,
       metadata: {
         orderId: updated.id,

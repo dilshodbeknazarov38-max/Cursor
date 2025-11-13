@@ -307,7 +307,7 @@ export class BalancesService {
           amount: productAmount,
           transactionType: BalanceTransactionType.LEAD_ACCEPTED,
           isCredit: true,
-          note: `Lead tasdiqlandi: ${lead.product.name}`,
+          note: `Lead tasdiqlandi: ${lead.product.title}`,
           metadata: {
             productId: lead.product.id,
             leadId,
@@ -496,7 +496,7 @@ export class BalancesService {
           amount: holdAmount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Lead bekor qilindi: ${lead.product.name}`,
+          note: `Lead bekor qilindi: ${lead.product.title}`,
           metadata: {
             leadId,
             productId: lead.product.id,
@@ -593,24 +593,24 @@ export class BalancesService {
   async handleOrderDelivered(orderId: string, actorId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        lead: true,
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sellerId: true,
-            cpaTargetolog: true,
-            cpaOperator: true,
-            seller: {
-              select: {
-                id: true,
-                salesSharePercent: true,
-                role: { select: { slug: true } },
+        include: {
+          lead: true,
+          product: {
+            select: {
+              id: true,
+              title: true,
+              ownerId: true,
+              cpaTargetolog: true,
+              cpaOperator: true,
+              owner: {
+                select: {
+                  id: true,
+                  salesSharePercent: true,
+                  role: { select: { slug: true } },
+                },
               },
             },
           },
-        },
         targetolog: {
           select: {
             id: true,
@@ -636,7 +636,7 @@ export class BalancesService {
       await this.handleLeadApproved(order.leadId, actorId);
     }
 
-    const productName = order.product.name;
+    const productName = order.product.title;
 
     if (
       order.product.cpaTargetolog &&
@@ -682,8 +682,8 @@ export class BalancesService {
       });
     }
 
-    if (order.product.seller?.id) {
-      const sharePercent = order.product.seller.salesSharePercent ?? new Prisma.Decimal(
+    if (order.product.owner?.id) {
+      const sharePercent = order.product.owner.salesSharePercent ?? new Prisma.Decimal(
         100,
       );
       const shareAmount = new Prisma.Decimal(order.amount).mul(
@@ -692,9 +692,9 @@ export class BalancesService {
 
       if (shareAmount.gt(0)) {
         await this.applyTransaction({
-          userId: order.product.seller.id,
+          userId: order.product.owner.id,
           accountType: this.resolveMainAccountType(
-            order.product.seller.role?.slug ?? '',
+            order.product.owner.role?.slug ?? '',
           ),
           amount: shareAmount,
           transactionType: BalanceTransactionType.LEAD_SOLD,
@@ -719,17 +719,17 @@ export class BalancesService {
       include: {
         lead: true,
         product: {
-          select: {
-            id: true,
-            name: true,
-            sellerId: true,
-            seller: {
-              select: {
-                id: true,
-                role: { select: { slug: true } },
+            select: {
+              id: true,
+              title: true,
+              ownerId: true,
+              owner: {
+                select: {
+                  id: true,
+                  role: { select: { slug: true } },
+                },
               },
             },
-          },
         },
         targetolog: {
           select: {
@@ -767,7 +767,7 @@ export class BalancesService {
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,
@@ -795,7 +795,7 @@ export class BalancesService {
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,
@@ -806,15 +806,15 @@ export class BalancesService {
       }
     }
 
-    if (order.product.seller?.id && order.leadId) {
+    if (order.product.owner?.id && order.leadId) {
       const saleTx = await this.prisma.balanceTransaction.findFirst({
         where: {
-          userId: order.product.seller.id,
+          userId: order.product.owner.id,
           leadId: order.leadId,
           type: BalanceTransactionType.LEAD_SOLD,
           account: {
             type: this.resolveMainAccountType(
-              order.product.seller.role?.slug ?? '',
+              order.product.owner.role?.slug ?? '',
             ),
           },
         },
@@ -822,14 +822,14 @@ export class BalancesService {
 
       if (saleTx) {
         await this.applyTransaction({
-          userId: order.product.seller.id,
+          userId: order.product.owner.id,
           accountType: this.resolveMainAccountType(
-            order.product.seller.role?.slug ?? '',
+            order.product.owner.role?.slug ?? '',
           ),
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,

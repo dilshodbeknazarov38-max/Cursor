@@ -33,22 +33,22 @@ export const ROLE_PERMISSIONS: Record<Role, RolePermission[]> = {
     { label: 'Hisobotlar', href: '/dashboard/oper-admin/reports', description: 'Kunlik KPI' },
   ],
   [Role.SKLAD_ADMIN]: [
-    { label: 'Inventar', href: '/dashboard/sklad-admin/inventory', description: 'Skladdagi mahsulotlar' },
+    { label: 'Tasdiqlash kutilayotgan mahsulotlar', href: '/dashboard/sklad-admin/products', description: 'Yangi mahsulotlarni ko‘rib chiqish' },
+    { label: 'Barcha mahsulotlar', href: '/dashboard/sklad-admin/products/all', description: 'Tasdiqlangan mahsulotlar ro‘yxati' },
     { label: 'Jo‘natmalar', href: '/dashboard/sklad-admin/shipments', description: 'Logistika holati' },
     { label: 'Qaytishlar', href: '/dashboard/sklad-admin/returns', description: 'Qaytgan buyurtmalar' },
-    { label: 'Integratsiyalar', href: '/dashboard/sklad-admin/integrations', description: 'Sklad integratsiyalari' },
   ],
   [Role.TAMINOTCHI]: [
     { label: 'Mahsulotlar', href: '/dashboard/taminotchi/products', description: 'Mahsulot ro‘yxati' },
+    { label: 'Yangi mahsulot qo‘shish', href: '/dashboard/taminotchi/products/new', description: 'Yangi mahsulot yaratish' },
     { label: 'Talablar', href: '/dashboard/taminotchi/requests', description: 'Sotuvdan kelgan talablar' },
-    { label: 'Yetkazib berish', href: '/dashboard/taminotchi/deliveries', description: 'Yetkazish jarayoni' },
     { label: 'Hisob-kitoblar', href: '/dashboard/taminotchi/payments', description: 'To‘lov va balans' },
   ],
   [Role.TARGETOLOG]: [
+    { label: 'Oqimlar', href: '/dashboard/targetolog/flows', description: 'Yaratilgan oqimlar' },
+    { label: 'Yangi oqim yaratish', href: '/dashboard/targetolog/flows/new', description: 'Mahsulot uchun yangi oqim yaratish' },
     { label: 'Ko‘rsatkichlar', href: '/dashboard/targetolog/performance', description: 'Kampaniya samaradorligi' },
     { label: 'Kreativlar', href: '/dashboard/targetolog/creatives', description: 'Banner va matnlar' },
-    { label: 'Auditoriyalar', href: '/dashboard/targetolog/audiences', description: 'Segmentlar boshqaruvi' },
-    { label: 'Test kampaniyalar', href: '/dashboard/targetolog/tests', description: 'A/B sinovlari' },
   ],
   [Role.OPERATOR]: [
     { label: 'Navbat', href: '/dashboard/operator/queue', description: 'Faol lidlar navbati' },
