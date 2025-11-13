@@ -109,16 +109,16 @@ export class BalancesService {
   ];
 
   private readonly ROLE_ACCOUNT_MAP: Record<string, BalanceAccountType[]> = {
+    ADMIN: [BalanceAccountType.MANAGER_MAIN],
+    TARGET_ADMIN: [BalanceAccountType.MANAGER_MAIN],
+    OPER_ADMIN: [BalanceAccountType.MANAGER_MAIN],
+    SKLAD_ADMIN: [BalanceAccountType.MANAGER_MAIN],
     TARGETOLOG: [
       BalanceAccountType.TARGETOLOG_HOLD,
       BalanceAccountType.TARGETOLOG_MAIN,
     ],
     OPERATOR: [BalanceAccountType.OPERATOR_HOLD, BalanceAccountType.OPERATOR_MAIN],
-    SOTUVCHI: [BalanceAccountType.SELLER_MAIN],
-    SELLER_ADMIN: [BalanceAccountType.SELLER_MAIN],
-    TARGET_ADMIN: [BalanceAccountType.GENERIC_MAIN],
-    OPER_ADMIN: [BalanceAccountType.GENERIC_MAIN],
-    SKLAD_ADMIN: [BalanceAccountType.GENERIC_MAIN],
+    TAMINOTCHI: [BalanceAccountType.SELLER_MAIN],
     BLOGGER: [BalanceAccountType.BLOGGER_MAIN],
     BLOGGER_ADMIN: [BalanceAccountType.BLOGGER_MAIN],
     MANAGER: [BalanceAccountType.MANAGER_MAIN],
@@ -126,17 +126,17 @@ export class BalancesService {
   };
 
   private readonly ROLE_MAIN_ACCOUNT: Record<string, BalanceAccountType> = {
+    ADMIN: BalanceAccountType.MANAGER_MAIN,
+    TARGET_ADMIN: BalanceAccountType.MANAGER_MAIN,
+    OPER_ADMIN: BalanceAccountType.MANAGER_MAIN,
+    SKLAD_ADMIN: BalanceAccountType.MANAGER_MAIN,
     TARGETOLOG: BalanceAccountType.TARGETOLOG_MAIN,
     OPERATOR: BalanceAccountType.OPERATOR_MAIN,
-    SOTUVCHI: BalanceAccountType.SELLER_MAIN,
-    SELLER_ADMIN: BalanceAccountType.SELLER_MAIN,
+    TAMINOTCHI: BalanceAccountType.SELLER_MAIN,
     BLOGGER: BalanceAccountType.BLOGGER_MAIN,
     BLOGGER_ADMIN: BalanceAccountType.BLOGGER_MAIN,
     MANAGER: BalanceAccountType.MANAGER_MAIN,
     MANAGER_ADMIN: BalanceAccountType.MANAGER_MAIN,
-    TARGET_ADMIN: BalanceAccountType.GENERIC_MAIN,
-    OPER_ADMIN: BalanceAccountType.GENERIC_MAIN,
-    SKLAD_ADMIN: BalanceAccountType.GENERIC_MAIN,
   };
 
   constructor(

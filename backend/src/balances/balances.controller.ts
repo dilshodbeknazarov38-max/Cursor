@@ -59,13 +59,13 @@ export class BalancesController {
   }
 
   @Get(':userId')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'OPER_ADMIN', 'TARGET_ADMIN', 'SELLER_ADMIN')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'OPER_ADMIN', 'TARGET_ADMIN', 'SKLAD_ADMIN')
   async getUserBalances(@Param('userId') userId: string) {
     return this.balancesService.getUserBalances(userId);
   }
 
   @Get(':userId/transactions')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'OPER_ADMIN', 'TARGET_ADMIN', 'SELLER_ADMIN')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'OPER_ADMIN', 'TARGET_ADMIN', 'SKLAD_ADMIN')
   async getUserTransactions(
     @Param('userId') userId: string,
     @Query() query: QueryTransactionsDto,

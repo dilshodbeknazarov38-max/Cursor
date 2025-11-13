@@ -147,7 +147,7 @@ export class PayoutsService {
           amount: updated.amount,
           cardNumber: updated.cardNumber ?? undefined,
           cardHolder: updated.cardHolder ?? undefined,
-          user: payout.user,
+          user: updated.user ?? payout.user,
         },
         context.userId,
       );
@@ -159,7 +159,7 @@ export class PayoutsService {
           amount: updated.amount,
           cardNumber: updated.cardNumber ?? undefined,
           cardHolder: updated.cardHolder ?? undefined,
-          user: payout.user,
+          user: updated.user ?? payout.user,
         },
         context.userId,
       );

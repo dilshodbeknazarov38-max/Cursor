@@ -40,11 +40,12 @@ export class ProductsController {
   @Roles(
     'ADMIN',
     'SUPER_ADMIN',
-    'SELLER_ADMIN',
     'TARGET_ADMIN',
+    'OPER_ADMIN',
+    'SKLAD_ADMIN',
     'TARGETOLOG',
     'OPERATOR',
-    'SKLAD_ADMIN',
+    'TAMINOTCHI',
   )
   findAll(
     @Req() req: AuthenticatedRequest,
@@ -56,23 +57,33 @@ export class ProductsController {
       (Object.values(ProductStatus) as string[]).includes(uppercased)
         ? (uppercased as ProductStatus)
         : undefined;
-    return this.productsService.findAll(req.user?.role ?? '', {
+    return this.productsService.findAll(
+      {
+        role: req.user?.role ?? '',
+        userId: req.user?.sub ?? '',
+      },
+      {
       status: normalizedStatus,
-    });
+      },
+    );
   }
 
   @Get(':id')
   @Roles(
     'ADMIN',
     'SUPER_ADMIN',
-    'SELLER_ADMIN',
     'TARGET_ADMIN',
+    'OPER_ADMIN',
     'TARGETOLOG',
     'OPERATOR',
     'SKLAD_ADMIN',
+    'TAMINOTCHI',
   )
   findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.productsService.findOne(id, req.user?.role ?? '');
+    return this.productsService.findOne(id, {
+      role: req.user?.role ?? '',
+      userId: req.user?.sub ?? '',
+    });
   }
 
   @UseInterceptors(
@@ -82,7 +93,7 @@ export class ProductsController {
     ]),
   )
   @Post()
-  @Roles('ADMIN', 'SELLER_ADMIN', 'SUPER_ADMIN', 'SOTUVCHI')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'TAMINOTCHI')
   create(
     @Body() dto: CreateProductDto,
     @UploadedFiles()
@@ -117,7 +128,7 @@ export class ProductsController {
     ]),
   )
   @Patch(':id')
-  @Roles('ADMIN', 'SELLER_ADMIN', 'SUPER_ADMIN', 'SOTUVCHI')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'TAMINOTCHI')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
@@ -143,7 +154,7 @@ export class ProductsController {
   }
 
   @Patch(':id/archive')
-  @Roles('ADMIN', 'SELLER_ADMIN')
+  @Roles('ADMIN', 'SUPER_ADMIN')
   archive(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.productsService.archive(id, {
       userId: req.user?.sub ?? '',

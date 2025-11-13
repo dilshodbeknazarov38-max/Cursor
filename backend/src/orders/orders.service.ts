@@ -172,7 +172,7 @@ export class OrdersService {
       where.targetologId = context.userId;
     } else if (context.role === 'OPERATOR') {
       where.operatorId = context.userId;
-    } else if (context.role === 'SOTUVCHI') {
+    } else if (context.role === 'TAMINOTCHI') {
       where.product = {
         is: {
           sellerId: context.userId,

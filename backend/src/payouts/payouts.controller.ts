@@ -36,7 +36,7 @@ export class PayoutsController {
   @Roles(
     'TARGETOLOG',
     'OPERATOR',
-    'SELLER_ADMIN',
+    'TAMINOTCHI',
     'TARGET_ADMIN',
     'OPER_ADMIN',
     'SKLAD_ADMIN',
@@ -57,7 +57,7 @@ export class PayoutsController {
   @Roles(
     'TARGETOLOG',
     'OPERATOR',
-    'SELLER_ADMIN',
+    'TAMINOTCHI',
     'TARGET_ADMIN',
     'OPER_ADMIN',
     'SKLAD_ADMIN',

@@ -98,7 +98,7 @@ const ACCOUNT_LABELS: Record<string, string> = {
   TARGETOLOG_MAIN: "Targetolog — Asosiy balans",
   OPERATOR_HOLD: "Operator — Hold balans",
   OPERATOR_MAIN: "Operator — Asosiy balans",
-  SELLER_MAIN: "Sotuvchi — Asosiy balans",
+  SELLER_MAIN: "Ta’minotchi — Asosiy balans",
   AFFILIATE_MAIN: "Affiliate — Asosiy balans",
   BLOGGER_MAIN: "Blogger — Asosiy balans",
   MANAGER_MAIN: "Menejer — Asosiy balans",
@@ -145,12 +145,11 @@ const STATUS_STYLES: Record<
 const ROLE_MAIN_MAP: Record<string, string> = {
   TARGETOLOG: "TARGETOLOG_MAIN",
   OPERATOR: "OPERATOR_MAIN",
-  SOTUVCHI: "SELLER_MAIN",
-  SELLER_ADMIN: "SELLER_MAIN",
-  TARGET_ADMIN: "GENERIC_MAIN",
-  OPER_ADMIN: "GENERIC_MAIN",
-  SKLAD_ADMIN: "GENERIC_MAIN",
-  ADMIN: "GENERIC_MAIN",
+  TAMINOTCHI: "SELLER_MAIN",
+  TARGET_ADMIN: "MANAGER_MAIN",
+  OPER_ADMIN: "MANAGER_MAIN",
+  SKLAD_ADMIN: "MANAGER_MAIN",
+  ADMIN: "MANAGER_MAIN",
   SUPER_ADMIN: "GENERIC_MAIN",
 };
 

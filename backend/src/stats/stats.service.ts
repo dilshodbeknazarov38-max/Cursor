@@ -461,19 +461,22 @@ export class StatsService {
           { label: 'Reyting hisobotlari', href: '/dashboard/target-admin/reports' },
         );
         break;
-      case 'SELLER_ADMIN':
-        activityWhere.user = {
-          role: {
-            slug: 'SOTUVCHI',
-          },
-        };
-        notificationWhere.OR = [
-          { type: NotificationType.ORDER },
-          { type: NotificationType.PAYOUT },
-        ];
+      case 'TAMINOTCHI':
+        if (hasUser) {
+          orderWhere.product = {
+            sellerId: userId,
+          };
+          payoutWhere.userId = userId;
+          activityWhere.userId = userId;
+          notificationWhere.OR = [
+            { toUserId: userId },
+            { type: NotificationType.ORDER },
+            { type: NotificationType.PAYOUT },
+          ];
+        }
         quickActions.push(
-          { label: 'Sotuvchi qo‘shish', href: '/dashboard/seller-admin/sellers/new' },
-          { label: 'Balans nazorati', href: '/dashboard/seller-admin/balances' },
+          { label: 'Mahsulot qo‘shish', href: '/dashboard/taminotchi/mahsulotlar/yangi' },
+          { label: 'Buyurtmalarim', href: '/dashboard/taminotchi/buyurtmalar' },
         );
         break;
       case 'SKLAD_ADMIN':
@@ -517,26 +520,6 @@ export class StatsService {
         quickActions.push(
           { label: 'Mahsulot katalogi', href: '/dashboard/targetolog/products' },
           { label: 'Payout so‘rovi', href: '/dashboard/targetolog/payout' },
-        );
-        break;
-      case 'SOTUVCHI':
-        if (hasUser) {
-          orderWhere.product = {
-            is: {
-              sellerId: userId,
-            },
-          };
-          payoutWhere.userId = userId;
-          activityWhere.userId = userId;
-          notificationWhere.OR = [
-            { toUserId: userId },
-            { type: NotificationType.ORDER },
-            { type: NotificationType.PAYOUT },
-          ];
-        }
-        quickActions.push(
-          { label: 'Mahsulot qo‘shish', href: '/dashboard/sotuvchi/products/new' },
-          { label: 'Payout so‘rovi', href: '/dashboard/sotuvchi/payout' },
         );
         break;
       case 'OPERATOR':
@@ -586,7 +569,7 @@ export class StatsService {
           value: formatNumber(data.roleCounts?.targetologs ?? 0),
         },
         {
-          label: 'Sotuvchilar',
+          label: 'Ta’minotchilar',
           value: formatNumber(data.roleCounts?.sellers ?? 0),
         },
         {
@@ -663,7 +646,7 @@ export class StatsService {
       ];
     }
 
-    if (role === 'SELLER_ADMIN') {
+    if (role === 'TAMINOTCHI') {
       return [
         {
           label: 'Bugungi buyurtmalar',
@@ -678,7 +661,7 @@ export class StatsService {
           value: formatCurrency(data.deliveredRevenue),
         },
         {
-          label: 'Top sotuvchilar',
+          label: 'Top mahsulotlar',
           value: `${formatNumber(data.topSellerCount ?? 0)} ta`,
         },
       ];
@@ -726,7 +709,7 @@ export class StatsService {
       ];
     }
 
-    if (role === 'SOTUVCHI') {
+    if (role === 'TAMINOTCHI') {
       return [
         {
           label: 'Bugungi buyurtmalar',
@@ -861,7 +844,7 @@ export class StatsService {
   }
 
   private requiresTopSellers(role: string) {
-    return ['ADMIN', 'SUPER_ADMIN', 'SELLER_ADMIN'].includes(role);
+    return ['ADMIN', 'SUPER_ADMIN', 'TAMINOTCHI'].includes(role);
   }
 
   private requiresTopOperators(role: string) {
@@ -874,7 +857,7 @@ export class StatsService {
         where: { role: { slug: 'TARGETOLOG' }, status: UserStatus.ACTIVE },
       }),
       this.prisma.user.count({
-        where: { role: { slug: 'SOTUVCHI' }, status: UserStatus.ACTIVE },
+        where: { role: { slug: 'TAMINOTCHI' }, status: UserStatus.ACTIVE },
       }),
       this.prisma.user.count({
         where: { role: { slug: 'OPERATOR' }, status: UserStatus.ACTIVE },

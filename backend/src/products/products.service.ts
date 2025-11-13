@@ -118,14 +118,14 @@ export class ProductsService {
       },
     });
 
-    if (context.role === 'SOTUVCHI') {
+    if (context.role === 'TAMINOTCHI') {
       await this.notifyAdminsOnPendingProduct(product.id, product.name, sellerId);
     }
 
     if (
       product.status === ProductStatus.ACTIVE &&
       product.seller &&
-      context.role !== 'SOTUVCHI'
+      context.role !== 'TAMINOTCHI'
     ) {
       await this.notificationsService.create({
         toUserId: product.seller.id,
@@ -143,12 +143,20 @@ export class ProductsService {
     };
   }
 
-  async findAll(role: string, filter?: { status?: ProductStatus }) {
+  async findAll(
+    context: AuthContext,
+    filter?: { status?: ProductStatus },
+  ) {
+    const role = context.role;
     const where: Prisma.ProductWhereInput = {};
     if (filter?.status) {
       where.status = filter.status;
     } else if (role === 'TARGETOLOG' || role === 'OPERATOR') {
       where.status = ProductStatus.ACTIVE;
+    }
+
+    if (role === 'TAMINOTCHI') {
+      where.sellerId = context.userId;
     }
 
     return this.prisma.product.findMany({
@@ -157,7 +165,7 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string, role: string) {
+  async findOne(id: string, context: AuthContext) {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
@@ -176,10 +184,13 @@ export class ProductsService {
       throw new NotFoundException('Mahsulot topilmadi.');
     }
 
+    const isSupplierOwner =
+      context.role === 'TAMINOTCHI' && product.sellerId === context.userId;
+
     if (
       product.status !== ProductStatus.ACTIVE &&
-      !this.isAdminRole(role) &&
-      role !== 'SELLER_ADMIN'
+      !this.isAdminRole(context.role) &&
+      !isSupplierOwner
     ) {
       throw new ForbiddenException(
         'Bu mahsulotni ko‘rish uchun ruxsatingiz yo‘q.',
@@ -350,7 +361,7 @@ export class ProductsService {
   }
 
   private ensureCreatePermission(role: string) {
-    if (!this.isAdminRole(role) && role !== 'SOTUVCHI') {
+    if (!this.isAdminRole(role) && role !== 'TAMINOTCHI') {
       throw new ForbiddenException(
         'Mahsulot qo‘shish uchun ruxsatingiz yo‘q.',
       );
@@ -365,7 +376,7 @@ export class ProductsService {
     if (this.isAdminRole(context.role)) {
       return;
     }
-    if (context.role === 'SOTUVCHI') {
+    if (context.role === 'TAMINOTCHI') {
       if (existing.sellerId !== context.userId) {
         throw new ForbiddenException(
           'Bu mahsulotni tahrirlash uchun ruxsatingiz yo‘q.',
@@ -387,7 +398,7 @@ export class ProductsService {
   }
 
   private isAdminRole(role: string) {
-    return ['ADMIN', 'SELLER_ADMIN', 'SUPER_ADMIN'].includes(role);
+    return ['ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN'].includes(role);
   }
 
   private normalizeStringArray(values?: string[] | null) {
@@ -409,9 +420,6 @@ export class ProductsService {
     context: AuthContext,
   ) {
     if (this.isAdminRole(context.role) && sellerIdFromDto) {
-      return sellerIdFromDto;
-    }
-    if (context.role === 'SELLER_ADMIN' && sellerIdFromDto) {
       return sellerIdFromDto;
     }
     if (context.userId) {
@@ -591,7 +599,7 @@ export class ProductsService {
       where: {
         role: {
           slug: {
-            in: ['ADMIN', 'SUPER_ADMIN', 'SELLER_ADMIN'],
+            in: ['ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN'],
           },
         },
       },

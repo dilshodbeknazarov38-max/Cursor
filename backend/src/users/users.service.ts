@@ -44,19 +44,19 @@ export class UsersService {
     nickname: string;
     phone: string;
     password: string;
-    roleSlug?: 'TARGETOLOG' | 'SOTUVCHI';
+    roleSlug?: 'TARGETOLOG' | 'TAMINOTCHI';
     email?: string | null;
     lastName?: string | null;
     referralCode?: string | null;
   }): Promise<SafeUser> {
-    const allowedRoles: Record<'TARGETOLOG' | 'SOTUVCHI', string> = {
+    const allowedRoles: Record<'TARGETOLOG' | 'TAMINOTCHI', string> = {
       TARGETOLOG: 'Targetolog',
-      SOTUVCHI: 'Sotuvchi',
+      TAMINOTCHI: 'Ta’minotchi',
     };
 
-    const normalizedRole = (payload.roleSlug ?? 'TARGETOLOG').toUpperCase() as
-      | 'TARGETOLOG'
-      | 'SOTUVCHI';
+      const normalizedRole = (payload.roleSlug ?? 'TARGETOLOG').toUpperCase() as
+        | 'TARGETOLOG'
+        | 'TAMINOTCHI';
 
     if (!(normalizedRole in allowedRoles)) {
       throw new BadRequestException(
@@ -67,14 +67,14 @@ export class UsersService {
     await this.ensureRoleExists(normalizedRole, allowedRoles[normalizedRole]);
 
     const [existingByPhone, existingByEmail] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { phone: payload.phone },
-      }),
-      payload.email
-        ? this.prisma.user.findUnique({
-            where: { email: payload.email },
-          })
-        : Promise.resolve(null),
+        this.prisma.user.findUnique({
+          where: { phone: payload.phone },
+        }),
+        payload.email
+          ? this.prisma.user.findUnique({
+              where: { email: payload.email },
+            })
+          : Promise.resolve(null),
     ]);
 
     if (existingByPhone) {

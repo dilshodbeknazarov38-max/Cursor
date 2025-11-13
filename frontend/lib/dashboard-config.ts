@@ -30,16 +30,15 @@ export type DashboardRoleConfig = {
   nav: DashboardNavGroup[];
 };
 
-const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
-  admin: [
+const NAV_CONFIG: Record<string, DashboardNavGroup[]> = {
+  "super-admin": [
     {
-      id: "dashboard",
-      title: "Bosh sahifa",
+      id: "overview",
+      title: "Platforma",
       icon: "home",
       items: [
-        { label: "Umumiy ko‘rinish", href: "/dashboard/admin" },
-        { label: "Statistika", href: "/dashboard/admin#statistika" },
-        { label: "So‘nggi faoliyat", href: "/dashboard/admin#faoliyat" },
+        { label: "Umumiy ko‘rsatkichlar", href: "/dashboard/super-admin" },
+        { label: "Faollik loglari", href: "/dashboard/super-admin#faoliyat" },
       ],
     },
     {
@@ -47,72 +46,18 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       title: "Foydalanuvchilar",
       icon: "users",
       items: [
-        { label: "Targetologlar", href: "/dashboard/admin/users/targetologlar" },
-        { label: "Sotuvchilar", href: "/dashboard/admin/users/sotuvchilar" },
-        { label: "Asosiy sotuvchilar", href: "/dashboard/admin/users/asosiy-sotuvchilar" },
-        { label: "Operatorlar", href: "/dashboard/admin/users/operatorlar" },
-        { label: "Adminlar", href: "/dashboard/admin/users/adminlar" },
+        { label: "Foydalanuvchilar ro‘yxati", href: "/dashboard/super-admin/foydalanuvchilar" },
+        { label: "Rollar va ruxsatlar", href: "/dashboard/super-admin/rollar" },
       ],
     },
     {
-      id: "products",
-      title: "Mahsulotlar",
-      icon: "package",
-      items: [
-        { label: "Mahsulotlar ro‘yxati", href: "/dashboard/admin/mahsulotlar" },
-        { label: "Yangi mahsulot qo‘shish", href: "/dashboard/admin/mahsulotlar/yangi" },
-        { label: "Kategoriyalar", href: "/dashboard/admin/mahsulotlar/kategoriyalar" },
-      ],
-    },
-    {
-      id: "orders",
-      title: "Buyurtmalar",
-      icon: "cart",
-      items: [
-        { label: "Buyurtmalar paneli", href: "/dashboard/admin/buyurtmalar" },
-        { label: "Status bo‘yicha nazorat", href: "/dashboard/admin/buyurtmalar/status" },
-        { label: "Operator nazorati", href: "/dashboard/admin/buyurtmalar/operatorlar" },
-      ],
-    },
-    {
-      id: "warehouse",
-      title: "Ombor / Sklad",
-      icon: "warehouse",
-      items: [
-        { label: "Ombor paneli", href: "/dashboard/admin/ombor" },
-        { label: "Yetkazib berish", href: "/dashboard/admin/ombor/yetkazib-berish" },
-        { label: "Inventar hisobotlari", href: "/dashboard/admin/ombor/hisobotlar" },
-      ],
-    },
-    {
-      id: "payments",
-      title: "To‘lovlar",
+      id: "balances",
+      title: "Balans & Fraud",
       icon: "money",
       items: [
-        { label: "Balanslar", href: "/dashboard/admin/tolovlar" },
-        { label: "Payout so‘rovlari", href: "/dashboard/admin/tolovlar/payout" },
-        { label: "To‘lov tarixi", href: "/dashboard/admin/tolovlar/tarix" },
-        { label: "Komissiyalar", href: "/dashboard/admin/tolovlar/komissiyalar" },
-      ],
-    },
-    {
-      id: "reports",
-      title: "Statistika va hisobotlar",
-      icon: "chart",
-      items: [
-        { label: "Umumiy hisobotlar", href: "/dashboard/admin/hisobotlar" },
-        { label: "Rol va bo‘limlar", href: "/dashboard/admin/hisobotlar/rollar" },
-        { label: "Grafika va diagrammalar", href: "/dashboard/admin/hisobotlar/grafiklar" },
-      ],
-    },
-    {
-      id: "notifications",
-      title: "Bildirishnomalar",
-      icon: "bell",
-      items: [
-        { label: "Xabarlar oqimi", href: "/dashboard/admin/bildirishnomalar" },
-        { label: "Operator xabarlari", href: "/dashboard/admin/bildirishnomalar/operatorlar" },
-        { label: "Targetolog xabarlari", href: "/dashboard/admin/bildirishnomalar/targetologlar" },
+        { label: "Balans nazorati", href: "/dashboard/super-admin/balans" },
+        { label: "Fraud tekshiruvlari", href: "/dashboard/super-admin/fraud" },
+        { label: "Payout so‘rovlari", href: "/dashboard/super-admin/tolovlar" },
       ],
     },
     {
@@ -120,68 +65,8 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       title: "Sozlamalar",
       icon: "shield",
       items: [
-        { label: "Umumiy sozlamalar", href: "/dashboard/admin/sozlamalar" },
-        { label: "Integratsiyalar", href: "/dashboard/admin/sozlamalar/integratsiyalar" },
-        { label: "Xavfsizlik va CAPTCHA", href: "/dashboard/admin/sozlamalar/xavfsizlik" },
-      ],
-    },
-    {
-      id: "profile",
-      title: "Profil",
-      icon: "user-check",
-      items: [
-        { label: "Mening profilim", href: "/dashboard/admin/profil" },
-        { label: "Sessiyalar va kirishlar", href: "/dashboard/admin/profil/sessiyalar" },
-      ],
-    },
-  ],
-  "super-admin": [
-    {
-      id: "dashboard",
-      title: "Bosh sahifa",
-      icon: "home",
-      items: [
-        { label: "Umumiy ko‘rsatkichlar", href: "/dashboard/super-admin" },
-        { label: "Bildirishnomalar", href: "/dashboard/super-admin#bildirishnomalar" },
-      ],
-    },
-    {
-      id: "users",
-      title: "Foydalanuvchilar",
-      icon: "users",
-      items: [
-        { label: "Targetologlar", href: "/dashboard/super-admin/users/targetologlar" },
-        { label: "Sotuvchilar", href: "/dashboard/super-admin/users/sotuvchilar" },
-        { label: "Operatorlar", href: "/dashboard/super-admin/users/operatorlar" },
-        { label: "Adminlar", href: "/dashboard/super-admin/users/adminlar" },
-      ],
-    },
-    {
-      id: "roles",
-      title: "Rollar va ruxsatlar",
-      icon: "clipboard",
-      items: [
-        { label: "Rollarni boshqarish", href: "/dashboard/super-admin/rollar" },
-        { label: "Ruxsatlarni ko‘rish", href: "/dashboard/super-admin/rollar/ruxsatlar" },
-      ],
-    },
-    {
-      id: "reports",
-      title: "Hisobotlar",
-      icon: "chart",
-      items: [
-        { label: "Umumiy hisobotlar", href: "/dashboard/super-admin/hisobotlar" },
-        { label: "Targetolog faoliyati", href: "/dashboard/super-admin/hisobotlar/targetologlar" },
-        { label: "Sotuvchi faoliyati", href: "/dashboard/super-admin/hisobotlar/sotuvchilar" },
-      ],
-    },
-    {
-      id: "notifications",
-      title: "Bildirishnomalar",
-      icon: "bell",
-      items: [
-        { label: "Tizim ogohlantirishlari", href: "/dashboard/super-admin/bildirishnomalar" },
-        { label: "Foydalanuvchi xabarlari", href: "/dashboard/super-admin/bildirishnomalar/foydalanuvchi" },
+        { label: "Tizim sozlamalari", href: "/dashboard/super-admin/sozlamalar" },
+        { label: "Integratsiyalar", href: "/dashboard/super-admin/sozlamalar/integratsiya" },
       ],
     },
     {
@@ -190,57 +75,64 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       icon: "user-check",
       items: [
         { label: "Shaxsiy ma’lumotlar", href: "/dashboard/super-admin/profil" },
-        { label: "Xavfsizlik sozlamalari", href: "/dashboard/super-admin/profil/xavfsizlik" },
+        { label: "Xavfsizlik", href: "/dashboard/super-admin/profil/xavfsizlik" },
       ],
     },
   ],
-  "oper-admin": [
+  admin: [
     {
-      id: "dashboard",
-      title: "Bosh sahifa",
+      id: "overview",
+      title: "Boshqaruv",
       icon: "home",
       items: [
-        { label: "Operatorlar faoliyati", href: "/dashboard/oper-admin" },
-        { label: "Bildirishnomalar", href: "/dashboard/oper-admin#bildirishnomalar" },
+        { label: "Umumiy ko‘rinish", href: "/dashboard/admin" },
+        { label: "Bildirishnomalar", href: "/dashboard/admin#bildirishnomalar" },
       ],
     },
     {
-      id: "operators",
-      title: "Operatorlar",
-      icon: "user-check",
+      id: "teams",
+      title: "Jamoalar",
+      icon: "users",
       items: [
-        { label: "Operatorlar ro‘yxati", href: "/dashboard/oper-admin/operators" },
-        { label: "Operator yaratish", href: "/dashboard/oper-admin/operators/yangi" },
-        { label: "Bloklash / faollashtirish", href: "/dashboard/oper-admin/operators/holat" },
+        { label: "Target jamoasi", href: "/dashboard/admin/target-jamoa" },
+        { label: "Operator jamoasi", href: "/dashboard/admin/operator-jamoa" },
+        { label: "Sklad boshqaruvi", href: "/dashboard/admin/sklad" },
       ],
     },
     {
-      id: "orders",
-      title: "Buyurtmalar",
-      icon: "cart",
+      id: "products",
+      title: "Mahsulot & oqimlar",
+      icon: "package",
       items: [
-        { label: "Operatorlarga tayinlash", href: "/dashboard/oper-admin/buyurtmalar" },
-        { label: "Yetkazilmoqda", href: "/dashboard/oper-admin/buyurtmalar/yetkazilmoqda" },
-        { label: "Qaytarilgan", href: "/dashboard/oper-admin/buyurtmalar/qaytarilgan" },
+        { label: "Mahsulotlar", href: "/dashboard/admin/mahsulotlar" },
+        { label: "Oqim nazorati", href: "/dashboard/admin/oqimlar" },
+      ],
+    },
+    {
+      id: "finance",
+      title: "Balans & to‘lovlar",
+      icon: "money",
+      items: [
+        { label: "Balanslar", href: "/dashboard/admin/balans" },
+        { label: "Payout so‘rovlari", href: "/dashboard/admin/payout" },
+        { label: "Fraud ogohlantirishlari", href: "/dashboard/admin/fraud" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
-      icon: "shield",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/oper-admin/profil" },
-      ],
+      icon: "user-check",
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/admin/profil" }],
     },
   ],
   "target-admin": [
     {
-      id: "dashboard",
+      id: "overview",
       title: "Bosh sahifa",
       icon: "home",
       items: [
-        { label: "Targetologlar statisitkasi", href: "/dashboard/target-admin" },
-        { label: "Reytinglar", href: "/dashboard/target-admin#reyting" },
+        { label: "Jamoa ko‘rsatkichlari", href: "/dashboard/target-admin" },
+        { label: "Leadlar oqimi", href: "/dashboard/target-admin#leadlar" },
       ],
     },
     {
@@ -249,80 +141,74 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       icon: "target",
       items: [
         { label: "Targetologlar ro‘yxati", href: "/dashboard/target-admin/targetologlar" },
-        { label: "Targetolog qo‘shish", href: "/dashboard/target-admin/targetologlar/yangi" },
-        { label: "Bloklash / faollashtirish", href: "/dashboard/target-admin/targetologlar/holat" },
+        { label: "Balans nazorati", href: "/dashboard/target-admin/balanslar" },
       ],
     },
     {
-      id: "notifications",
-      title: "Bildirishnomalar",
-      icon: "bell",
+      id: "fraud",
+      title: "Fraud va bloklash",
+      icon: "shield",
       items: [
-        { label: "Targetologlarga xabar", href: "/dashboard/target-admin/bildirishnomalar" },
+        { label: "Fraud leadlar", href: "/dashboard/target-admin/fraud" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
       icon: "user-check",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/target-admin/profil" },
-      ],
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/target-admin/profil" }],
     },
   ],
-  "seller-admin": [
+  "oper-admin": [
     {
-      id: "dashboard",
+      id: "overview",
       title: "Bosh sahifa",
       icon: "home",
       items: [
-        { label: "Sotuvchilar statistikasi", href: "/dashboard/seller-admin" },
-        { label: "Top sotuvchilar", href: "/dashboard/seller-admin#reyting" },
+        { label: "Operator ko‘rsatkichlari", href: "/dashboard/oper-admin" },
+        { label: "KPI monitoringi", href: "/dashboard/oper-admin#kpi" },
       ],
     },
     {
-      id: "sellers",
-      title: "Sotuvchilar",
+      id: "operators",
+      title: "Operatorlar",
       icon: "users",
       items: [
-        { label: "Sotuvchilar ro‘yxati", href: "/dashboard/seller-admin/sotuvchilar" },
-        { label: "Sotuvchi qo‘shish", href: "/dashboard/seller-admin/sotuvchilar/yangi" },
-        { label: "Bloklash / faollashtirish", href: "/dashboard/seller-admin/sotuvchilar/holat" },
+        { label: "Operatorlar ro‘yxati", href: "/dashboard/oper-admin/operatorlar" },
+        { label: "Grafik va navbatchilik", href: "/dashboard/oper-admin/grafik" },
       ],
     },
     {
-      id: "mentors",
-      title: "Asosiy sotuvchilar",
-      icon: "clipboard",
+      id: "orders",
+      title: "Buyurtmalar",
+      icon: "cart",
       items: [
-        { label: "Asosiy sotuvchilar", href: "/dashboard/seller-admin/asosiy-sotuvchilar" },
-        { label: "Qo‘llab-quvvatlash vazifalari", href: "/dashboard/seller-admin/asosiy-sotuvchilar/vazifalar" },
+        { label: "Buyurtmalar paneli", href: "/dashboard/oper-admin/buyurtmalar" },
+        { label: "Qayta aloqa", href: "/dashboard/oper-admin/buyurtmalar/qayta-aloqa" },
       ],
     },
     {
-      id: "notifications",
-      title: "Bildirishnomalar",
+      id: "calls",
+      title: "Qo‘ng‘iroqlar",
       icon: "bell",
       items: [
-        { label: "Sotuvchilarga xabar", href: "/dashboard/seller-admin/bildirishnomalar" },
+        { label: "Call loglari", href: "/dashboard/oper-admin/calls" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
       icon: "user-check",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/seller-admin/profil" },
-      ],
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/oper-admin/profil" }],
     },
   ],
   "sklad-admin": [
     {
-      id: "dashboard",
+      id: "overview",
       title: "Bosh sahifa",
       icon: "home",
       items: [
-        { label: "Qabul qilingan buyurtmalar", href: "/dashboard/sklad-admin" },
+        { label: "Logistika paneli", href: "/dashboard/sklad-admin" },
         { label: "Bildirishnomalar", href: "/dashboard/sklad-admin#bildirishnomalar" },
       ],
     },
@@ -331,92 +217,44 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       title: "Buyurtmalar",
       icon: "cart",
       items: [
-        { label: "Qabul qilingan buyurtmalar", href: "/dashboard/sklad-admin/buyurtmalar/qabul-qilingan" },
-        { label: "Yetkazilmoqda", href: "/dashboard/sklad-admin/buyurtmalar/yetkazilmoqda" },
-        { label: "Muammoli buyurtmalar", href: "/dashboard/sklad-admin/buyurtmalar/muammolar" },
+        { label: "Qadoqlash navbatchiligi", href: "/dashboard/sklad-admin/buyurtmalar/qadoqlash" },
+        { label: "Yo‘lda", href: "/dashboard/sklad-admin/buyurtmalar/yolda" },
+        { label: "Qaytganlar", href: "/dashboard/sklad-admin/buyurtmalar/qaytgan" },
       ],
     },
     {
       id: "warehouse",
-      title: "Ombor / Sklad",
+      title: "Ombor",
       icon: "warehouse",
       items: [
-        { label: "Ombor mahsulotlari", href: "/dashboard/sklad-admin/ombor" },
-        { label: "Zaxira balanslari", href: "/dashboard/sklad-admin/ombor/zaxira" },
-        { label: "Yetkazib berish hisobotlari", href: "/dashboard/sklad-admin/ombor/hisobotlar" },
-      ],
-    },
-    {
-      id: "notifications",
-      title: "Bildirishnomalar",
-      icon: "bell",
-      items: [
-        { label: "Yetkazib berish ogohlantirishlari", href: "/dashboard/sklad-admin/bildirishnomalar" },
+        { label: "Mahsulot qoldig‘i", href: "/dashboard/sklad-admin/ombor" },
+        { label: "Ta’minot loglari", href: "/dashboard/sklad-admin/ombor/loglar" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
       icon: "user-check",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/sklad-admin/profil" },
-      ],
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/sklad-admin/profil" }],
     },
   ],
-  targetolog: [
+  taminotchi: [
     {
-      id: "dashboard",
+      id: "overview",
       title: "Bosh sahifa",
       icon: "home",
       items: [
-        { label: "Umumiy ko‘rsatkichlar", href: "/dashboard/targetolog" },
-        { label: "Reyting va hisobotlar", href: "/dashboard/targetolog#hisobot" },
+        { label: "Mahsulot ko‘rsatkichlari", href: "/dashboard/taminotchi" },
+        { label: "Loglar", href: "/dashboard/taminotchi#loglar" },
       ],
     },
     {
       id: "products",
-      title: "Mahsulotlar",
+      title: "Mahsulotlarim",
       icon: "package",
       items: [
-        { label: "Mahsulotlar katalogi", href: "/dashboard/targetolog/mahsulotlar" },
-        { label: "Affiliate havolalar", href: "/dashboard/targetolog/mahsulotlar/havolalar" },
-      ],
-    },
-    {
-      id: "finance",
-      title: "Balans va to‘lovlar",
-      icon: "money",
-      items: [
-        { label: "Balansim", href: "/dashboard/targetolog/balans" },
-        { label: "Payout so‘rovi yuborish", href: "/dashboard/targetolog/payout" },
-        { label: "To‘lov tarixi", href: "/dashboard/targetolog/tolovlar" },
-      ],
-    },
-    {
-      id: "notifications",
-      title: "Bildirishnomalar",
-      icon: "bell",
-      items: [
-        { label: "Target Admin xabarlari", href: "/dashboard/targetolog/bildirishnomalar" },
-      ],
-    },
-    {
-      id: "profile",
-      title: "Profil",
-      icon: "user-check",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/targetolog/profil" },
-      ],
-    },
-  ],
-  sotuvchi: [
-    {
-      id: "dashboard",
-      title: "Bosh sahifa",
-      icon: "home",
-      items: [
-        { label: "Sotuv va buyurtma statistikasi", href: "/dashboard/sotuvchi" },
-        { label: "Tezkor ko‘rsatkichlar", href: "/dashboard/sotuvchi#tezkor" },
+        { label: "Mahsulot ro‘yxati", href: "/dashboard/taminotchi/mahsulotlar" },
+        { label: "Yangi mahsulot qo‘shish", href: "/dashboard/taminotchi/mahsulotlar/yangi" },
       ],
     },
     {
@@ -424,46 +262,43 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       title: "Buyurtmalar",
       icon: "cart",
       items: [
-        { label: "Mening buyurtmalarim", href: "/dashboard/sotuvchi/buyurtmalar" },
-        { label: "Status monitoringi", href: "/dashboard/sotuvchi/buyurtmalar/status" },
+        { label: "Aktiv buyurtmalar", href: "/dashboard/taminotchi/buyurtmalar" },
+        { label: "Arxiv", href: "/dashboard/taminotchi/buyurtmalar/arxiv" },
       ],
     },
     {
       id: "finance",
-      title: "Balans va to‘lovlar",
+      title: "Balans & to‘lovlar",
       icon: "money",
       items: [
-        { label: "Balansim", href: "/dashboard/sotuvchi/balans" },
-        { label: "Payout so‘rovi", href: "/dashboard/sotuvchi/payout" },
-        { label: "To‘lov tarixi", href: "/dashboard/sotuvchi/tolovlar" },
-      ],
-    },
-    {
-      id: "products",
-      title: "Mahsulotlar",
-      icon: "package",
-      items: [
-        { label: "Mening mahsulotlarim", href: "/dashboard/sotuvchi/mahsulotlar" },
-        { label: "Mahsulot qo‘shish", href: "/dashboard/sotuvchi/mahsulotlar/yangi" },
+        { label: "Balansim", href: "/dashboard/taminotchi/payout" },
+        { label: "To‘lov tarixi", href: "/dashboard/taminotchi/tolovlar" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
       icon: "user-check",
-      items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/sotuvchi/profil" },
-      ],
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/taminotchi/profil" }],
     },
   ],
   operator: [
     {
-      id: "dashboard",
+      id: "overview",
       title: "Bosh sahifa",
       icon: "home",
       items: [
-        { label: "Mening buyurtmalarim", href: "/dashboard/operator" },
-        { label: "Yangi buyurtmalar", href: "/dashboard/operator#yangi" },
+        { label: "Bugungi vazifalar", href: "/dashboard/operator" },
+        { label: "Bildirishnomalar", href: "/dashboard/operator#bildirishnomalar" },
+      ],
+    },
+    {
+      id: "leads",
+      title: "Leadlar",
+      icon: "target",
+      items: [
+        { label: "Yangi leadlar", href: "/dashboard/operator/leadlar/yangi" },
+        { label: "Qabul qilingan leadlar", href: "/dashboard/operator/leadlar/qabul" },
       ],
     },
     {
@@ -471,92 +306,140 @@ const NAV_COMMON: Record<string, DashboardNavGroup[]> = {
       title: "Buyurtmalar",
       icon: "cart",
       items: [
-        { label: "Status monitoringi", href: "/dashboard/operator/buyurtmalar/status" },
+        { label: "Buyurtmalar paneli", href: "/dashboard/operator/buyurtmalar" },
         { label: "Qayta aloqa", href: "/dashboard/operator/buyurtmalar/qayta-aloqa" },
+      ],
+    },
+    {
+      id: "finance",
+      title: "Balans",
+      icon: "money",
+      items: [
+        { label: "Balansim", href: "/dashboard/operator/payout" },
+        { label: "To‘lov tarixi", href: "/dashboard/operator/tolovlar" },
       ],
     },
     {
       id: "profile",
       title: "Profil",
       icon: "user-check",
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/operator/profil" }],
+    },
+  ],
+  targetolog: [
+    {
+      id: "overview",
+      title: "Bosh sahifa",
+      icon: "home",
       items: [
-        { label: "Shaxsiy ma’lumotlar", href: "/dashboard/operator/profil" },
+        { label: "KPI paneli", href: "/dashboard/targetolog" },
+        { label: "Bildirishnomalar", href: "/dashboard/targetolog#bildirishnomalar" },
       ],
+    },
+    {
+      id: "leads",
+      title: "Leadlar",
+      icon: "target",
+      items: [
+        { label: "Leadlarim", href: "/dashboard/targetolog/leadlar" },
+        { label: "Yangi lead yaratish", href: "/dashboard/targetolog/leadlar/yangi" },
+      ],
+    },
+    {
+      id: "products",
+      title: "Mahsulotlar",
+      icon: "package",
+      items: [
+        { label: "Mahsulot katalogi", href: "/dashboard/targetolog/mahsulotlar" },
+      ],
+    },
+    {
+      id: "finance",
+      title: "Balans & payout",
+      icon: "money",
+      items: [
+        { label: "Balansim", href: "/dashboard/targetolog/payout" },
+        { label: "To‘lov tarixi", href: "/dashboard/targetolog/tolovlar" },
+      ],
+    },
+    {
+      id: "profile",
+      title: "Profil",
+      icon: "user-check",
+      items: [{ label: "Shaxsiy ma’lumotlar", href: "/dashboard/targetolog/profil" }],
     },
   ],
 };
 
 export const DASHBOARD_CONFIG: Record<string, DashboardRoleConfig> = {
+  "super-admin": {
+    slug: "super-admin",
+    label: "SuperAdmin",
+    title: "SuperAdmin boshqaruv paneli",
+    description:
+      "Platforma darajasidagi barcha jarayonlarni boshqarish va kuzatish uchun markaz.",
+    nav: NAV_CONFIG["super-admin"],
+  },
   admin: {
     slug: "admin",
     label: "Admin",
     title: "Admin boshqaruv paneli",
     description:
-      "CPAMaRKeT.Uz tizimining barcha jarayonlarini boshqarish va monitoring qilish.",
-    nav: NAV_COMMON.admin,
-  },
-  "super-admin": {
-    slug: "super-admin",
-    label: "Super Admin",
-    title: "Super Admin paneli",
-    description: "Foydalanuvchilar va tizim hisobotlarini kuzatish.",
-    nav: NAV_COMMON["super-admin"],
-  },
-  "oper-admin": {
-    slug: "oper-admin",
-    label: "Oper Admin",
-    title: "Operatsion boshqaruv paneli",
-    description:
-      "Operatorlar ishini va buyurtmalar jarayonini nazorat qiling.",
-    nav: NAV_COMMON["oper-admin"],
+      "Bo‘lim boshliqlari, mahsulotlar va moliyaviy jarayonlarni boshqarish uchun panel.",
+    nav: NAV_CONFIG.admin,
   },
   "target-admin": {
     slug: "target-admin",
     label: "Target Admin",
-    title: "Targetologlar paneli",
-    description: "Targetologlar va ularning leadlari ustidan nazorat qiling.",
-    nav: NAV_COMMON["target-admin"],
+    title: "Targetologlar boshqaruvi",
+    description:
+      "Targetologlar jamoasi, kampaniyalar va lead sifatini nazorat qilish.",
+    nav: NAV_CONFIG["target-admin"],
   },
-  "seller-admin": {
-    slug: "seller-admin",
-    label: "Seller Admin",
-    title: "Sotuvchilar boshqaruvi",
-    description: "Sotuvchilar va ularning natijalarini nazorat qiling.",
-    nav: NAV_COMMON["seller-admin"],
+  "oper-admin": {
+    slug: "oper-admin",
+    label: "Oper Admin",
+    title: "Operatorlar boshqaruvi",
+    description:
+      "Operatorlar samaradorligi, jadval va qo‘ng‘iroq jarayonlarini boshqarish.",
+    nav: NAV_CONFIG["oper-admin"],
   },
   "sklad-admin": {
     slug: "sklad-admin",
     label: "Sklad Admin",
-    title: "Ombor va logistika paneli",
-    description: "Operatorlar qabul qilgan buyurtmalarni yetkazib berish.",
-    nav: NAV_COMMON["sklad-admin"],
+    title: "Sklad va logistika boshqaruvi",
+    description:
+      "Qadoqlash, yetkazib berish va qaytarish jarayonlarini rejalashtirish.",
+    nav: NAV_CONFIG["sklad-admin"],
   },
-  targetolog: {
-    slug: "targetolog",
-    label: "Targetolog",
-    title: "Targetologlar uchun panel",
-    description: "Shaxsiy leadlar, statistika va to‘lovlarni kuzatish.",
-    nav: NAV_COMMON.targetolog,
-  },
-  sotuvchi: {
-    slug: "sotuvchi",
-    label: "Sotuvchi",
-    title: "Sotuvchilar uchun boshqaruv paneli",
-    description: "Mahsulotlar, buyurtmalar va balansni boshqaring.",
-    nav: NAV_COMMON.sotuvchi,
+  taminotchi: {
+    slug: "taminotchi",
+    label: "Ta’minotchi",
+    title: "Ta’minotchi paneli",
+    description:
+      "Mahsulot ta’minoti, zaxiralar va o‘z buyurtmalarini nazorat qilish.",
+    nav: NAV_CONFIG.taminotchi,
   },
   operator: {
     slug: "operator",
     label: "Operator",
-    title: "Operator boshqaruv paneli",
-    description: "Biriktirilgan buyurtmalarni ko‘rib chiqing va yangilang.",
-    nav: NAV_COMMON.operator,
+    title: "Operator ishchi paneli",
+    description:
+      "Qo‘ng‘iroqlar, leadlar va buyurtmalar bilan ishlash uchun qulay interfeys.",
+    nav: NAV_CONFIG.operator,
+  },
+  targetolog: {
+    slug: "targetolog",
+    label: "Targetolog",
+    title: "Targetolog ishchi paneli",
+    description:
+      "Reklama oqimlari, leadlar va balansni boshqarish uchun qulay panel.",
+    nav: NAV_CONFIG.targetolog,
   },
 };
 
-export const SUPPORTED_DASHBOARD_ROLES = Object.keys(DASHBOARD_CONFIG);
-
-export function getDashboardConfig(role: string): DashboardRoleConfig | undefined {
-  const normalized = role.toLowerCase();
-  return DASHBOARD_CONFIG[normalized];
+export function getDashboardConfig(role: string) {
+  return DASHBOARD_CONFIG[role];
 }
+
+export const SUPPORTED_DASHBOARD_ROLES = Object.keys(DASHBOARD_CONFIG);

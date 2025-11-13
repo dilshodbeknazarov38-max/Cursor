@@ -247,7 +247,7 @@ export function DashboardRoleClient({
                 {formatNumber(currentStats.overview.roleCounts.targetologs)}
               </span>
               <span className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 font-medium">
-                Sotuvchilar:{" "}
+                Ta’minotchilar:{" "}
                 {formatNumber(currentStats.overview.roleCounts.sellers)}
               </span>
               <span className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 font-medium">
@@ -430,7 +430,7 @@ export function DashboardRoleClient({
             <Card className="border-neutral-200">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold text-neutral-900">
-                  Top sotuvchilar
+                  Top ta’minotchilar
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
