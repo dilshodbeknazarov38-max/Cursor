@@ -255,7 +255,7 @@ export class StatsService {
       this.prisma.lead.count({
         where: {
           ...context.leadWhere,
-          status: LeadStatus.QAYTA_ALOQA,
+          status: LeadStatus.CALLBACK,
         },
       }),
       this.prisma.order.groupBy({

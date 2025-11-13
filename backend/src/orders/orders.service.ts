@@ -329,10 +329,10 @@ export class OrdersService {
         : null;
 
     if (dto.status === OrderStatus.DELIVERED && order.leadId) {
-      if (order.lead?.status !== LeadStatus.TASDIQLANGAN) {
+      if (order.lead?.status !== LeadStatus.CONFIRMED) {
         await this.prisma.lead.update({
           where: { id: order.leadId },
-          data: { status: LeadStatus.TASDIQLANGAN },
+          data: { status: LeadStatus.CONFIRMED },
         });
       }
 
@@ -361,10 +361,10 @@ export class OrdersService {
     }
 
     if (dto.status === OrderStatus.RETURNED && order.leadId) {
-      if (order.lead?.status !== LeadStatus.RAD_ETILGAN) {
+      if (order.lead?.status !== LeadStatus.CANCELLED) {
         await this.prisma.lead.update({
           where: { id: order.leadId },
-          data: { status: LeadStatus.RAD_ETILGAN },
+          data: { status: LeadStatus.CANCELLED },
         });
       }
 

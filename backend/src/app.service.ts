@@ -329,11 +329,25 @@ export class AppService implements OnModuleInit {
         },
       }));
 
+    const flow = await this.prisma.flow.create({
+      data: {
+        title: 'Demo oqim',
+        slug: `demo-${product.id.slice(0, 6)}`,
+        url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/products/${product.id}`,
+        productId: product.id,
+        ownerId: targetUser.id,
+      },
+    });
+
     const lead = await this.prisma.lead.create({
       data: {
+        flowId: flow.id,
         productId: product.id,
         targetologId: targetUser.id,
-        status: LeadStatus.TASDIQLANGAN,
+        operatorId: operatorUser.id,
+        phone: '+998901112233',
+        name: 'Demo lead',
+        status: LeadStatus.CONFIRMED,
         notes: 'Demo lid avtomatik yaratilgan.',
       },
     });

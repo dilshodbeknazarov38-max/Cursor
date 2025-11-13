@@ -58,8 +58,8 @@ export const ROLE_PERMISSIONS: Record<Role, RolePermission[]> = {
     { label: 'Kreativlar', href: '/dashboard/targetolog/creatives', description: 'Banner va matnlar' },
   ],
   [Role.OPERATOR]: [
+    { label: 'Lidlar', href: '/dashboard/operator/leads', description: 'Yangi lidlar navbati' },
     { label: 'Balans', href: '/dashboard/operator/payouts', description: 'Balans va payoutlar' },
-    { label: 'Navbat', href: '/dashboard/operator/queue', description: 'Faol lidlar navbati' },
     { label: 'Qo‘ng‘iroqlar', href: '/dashboard/operator/calls', description: 'Yaqinda qilingan qo‘ng‘iroqlar' },
     { label: 'Ssenariylar', href: '/dashboard/operator/scripts', description: 'Operator ssenariylari' },
     { label: 'Natijalar', href: '/dashboard/operator/results', description: 'Konversiya tahlili' },

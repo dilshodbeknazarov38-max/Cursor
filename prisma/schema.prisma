@@ -27,10 +27,11 @@ enum ProductStatus {
 }
 
 enum LeadStatus {
-  YANGI
-  TASDIQLANGAN
-  RAD_ETILGAN
-  QAYTA_ALOQA
+  NEW
+  ASSIGNED
+  CALLBACK
+  CONFIRMED
+  CANCELLED
 }
 
 enum OrderStatus {
@@ -124,6 +125,7 @@ model User {
   products         Product[]            @relation("ProductOwner")
   flows            Flow[]               @relation("FlowOwner")
   leads            Lead[]               @relation("LeadTargetolog")
+  operatorLeads    Lead[]               @relation("LeadOperator")
   ordersAsTarget   Order[]              @relation("OrderTargetolog")
   ordersAsOperator Order[]              @relation("OrderOperator")
   payouts          Payout[]
@@ -213,6 +215,7 @@ model Flow {
   ownerId   String
   product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   owner     User       @relation("FlowOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  leadRecords Lead[]
 
   @@index([productId])
   @@index([ownerId])
@@ -320,19 +323,26 @@ model Transaction {
 }
 
 model Lead {
-  id            String      @id @default(uuid())
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  targetologId  String
-  productId     String
-  status        LeadStatus  @default(YANGI)
-  notes         String?
-  targetolog    User        @relation("LeadTargetolog", fields: [targetologId], references: [id], onDelete: Cascade)
-  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orders        Order[]
+  id               String      @id @default(uuid())
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  flowId           String
+  productId        String
+  targetologId     String
+  operatorId       String?
+  phone            String
+  name             String?
+  status           LeadStatus  @default(NEW)
+  notes            String?
+  flow             Flow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  targetolog       User        @relation("LeadTargetolog", fields: [targetologId], references: [id], onDelete: Cascade)
+  operator         User?       @relation("LeadOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  orders           Order[]
   balanceTransactions BalanceTransaction[]
 
   @@index([targetologId])
+  @@index([operatorId])
   @@index([productId])
   @@index([status])
 }
