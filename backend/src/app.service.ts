@@ -352,16 +352,19 @@ export class AppService implements OnModuleInit {
       },
     });
 
-    await this.prisma.order.create({
-      data: {
-        productId: product.id,
-        targetologId: targetUser.id,
-        operatorId: operatorUser.id,
-        leadId: lead.id,
-        status: OrderStatus.DELIVERED,
-        amount: new Prisma.Decimal('350000'),
-      },
-    });
+      await this.prisma.order.create({
+        data: {
+          productId: product.id,
+          targetologId: targetUser.id,
+          operatorId: operatorUser.id,
+          leadId: lead.id,
+          status: OrderStatus.DELIVERED,
+          amount: new Prisma.Decimal('350000'),
+          packedAt: new Date(),
+          shippedAt: new Date(),
+          deliveredAt: new Date(),
+        },
+      });
 
     const targetMainAccount = await this.prisma.balanceAccount.upsert({
       where: {

@@ -326,7 +326,7 @@ export class LeadsService {
           targetologId: lead.targetologId,
           operatorId: context.userId,
           leadId: lead.id,
-          status: OrderStatus.ASSIGNED,
+          status: OrderStatus.PACKING,
           amount: orderAmount,
         },
         include: {

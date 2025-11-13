@@ -3,8 +3,8 @@ import {
   Controller,
   Get,
   Param,
-  Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -18,7 +18,6 @@ import { RolesGuard } from '@/common/guards/roles.guard';
 
 import { AssignOperatorDto } from './dto/assign-operator.dto';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
 
 type AuthenticatedRequest = Request & {
@@ -75,7 +74,7 @@ export class OrdersController {
     );
   }
 
-  @Patch(':id/assign')
+  @Put(':id/assign')
   @Roles('ADMIN', 'OPER_ADMIN')
   assignOperator(
     @Param('id') id: string,
@@ -88,23 +87,37 @@ export class OrdersController {
     });
   }
 
-  @Patch(':id/status')
-  @Roles('ADMIN', 'OPER_ADMIN', 'OPERATOR', 'SKLAD_ADMIN')
-  updateStatus(
-    @Param('id') id: string,
-    @Body() dto: UpdateOrderStatusDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    return this.ordersService.updateStatus(id, dto, {
+  @Put(':id/pack')
+  @Roles('SKLAD_ADMIN', 'SUPER_ADMIN')
+  pack(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.ordersService.packOrder(id, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
     });
   }
 
-  @Patch(':id/archive')
-  @Roles('ADMIN')
-  archive(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.ordersService.archive(id, {
+  @Put(':id/ship')
+  @Roles('SKLAD_ADMIN', 'SUPER_ADMIN')
+  ship(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.ordersService.shipOrder(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/deliver')
+  @Roles('SKLAD_ADMIN', 'SUPER_ADMIN')
+  deliver(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.ordersService.deliverOrder(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/return')
+  @Roles('SKLAD_ADMIN', 'SUPER_ADMIN')
+  returnOrder(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.ordersService.returnOrder(id, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
     });

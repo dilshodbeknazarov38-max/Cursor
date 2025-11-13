@@ -35,12 +35,10 @@ enum LeadStatus {
 }
 
 enum OrderStatus {
-  NEW
-  ASSIGNED
-  IN_DELIVERY
+  PACKING
+  SHIPPED
   DELIVERED
   RETURNED
-  ARCHIVED
 }
 
 enum PayoutStatus {
@@ -355,8 +353,12 @@ model Order {
   targetologId  String
   operatorId    String?
   leadId        String?
-  status        OrderStatus  @default(NEW)
+  status        OrderStatus  @default(PACKING)
   amount        Decimal      @db.Decimal(12, 2)
+  packedAt      DateTime?
+  shippedAt     DateTime?
+  deliveredAt   DateTime?
+  returnedAt    DateTime?
   product       Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
   targetolog    User         @relation("OrderTargetolog", fields: [targetologId], references: [id], onDelete: Restrict)
   operator      User?        @relation("OrderOperator", fields: [operatorId], references: [id], onDelete: SetNull)

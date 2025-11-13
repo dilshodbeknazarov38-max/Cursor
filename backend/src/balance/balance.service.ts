@@ -67,15 +67,16 @@ export class BalanceService {
     userId: string,
     amount: Prisma.Decimal | number | string,
     meta?: Prisma.InputJsonValue,
+    tx?: Prisma.TransactionClient,
   ) {
     const decimalAmount = this.ensurePositive(amount);
 
-    await this.prisma.$transaction(async (tx) => {
-      const balance = await this.ensureUserBalance(userId, tx);
+    const runner = async (client: Prisma.TransactionClient) => {
+      const balance = await this.ensureUserBalance(userId, client);
       const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
       const nextHold = currentHold.plus(decimalAmount);
 
-      await tx.userBalance.update({
+      await client.userBalance.update({
         where: { userId },
         data: { holdBalance: nextHold },
       });
@@ -85,8 +86,17 @@ export class BalanceService {
         type: TransactionType.HOLD_ADD,
         amount: decimalAmount,
         meta,
-        tx,
+        tx: client,
       });
+    };
+
+    if (tx) {
+      await runner(tx);
+      return this.ensureUserBalance(userId, tx);
+    }
+
+    await this.prisma.$transaction(async (client) => {
+      await runner(client);
     });
 
     return this.ensureUserBalance(userId);
@@ -96,11 +106,12 @@ export class BalanceService {
     userId: string,
     amount: Prisma.Decimal | number | string,
     meta?: Prisma.InputJsonValue,
+    tx?: Prisma.TransactionClient,
   ) {
     const decimalAmount = this.ensurePositive(amount);
 
-    await this.prisma.$transaction(async (tx) => {
-      const balance = await this.ensureUserBalance(userId, tx);
+    const runner = async (client: Prisma.TransactionClient) => {
+      const balance = await this.ensureUserBalance(userId, client);
       const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
 
       if (currentHold.lt(decimalAmount)) {
@@ -109,20 +120,29 @@ export class BalanceService {
 
       const nextHold = currentHold.minus(decimalAmount);
 
-      await tx.userBalance.update({
+      await client.userBalance.update({
         where: { userId },
         data: { holdBalance: nextHold },
       });
 
-      await this.adjustMainBalance(userId, decimalAmount, 'INCREASE', tx);
+      await this.adjustMainBalance(userId, decimalAmount, 'INCREASE', client);
 
       await this.transactionsService.record({
         userId,
         type: TransactionType.HOLD_RELEASE,
         amount: decimalAmount,
         meta,
-        tx,
+        tx: client,
       });
+    };
+
+    if (tx) {
+      await runner(tx);
+      return this.ensureUserBalance(userId, tx);
+    }
+
+    await this.prisma.$transaction(async (client) => {
+      await runner(client);
     });
 
     return this.ensureUserBalance(userId);
@@ -132,11 +152,12 @@ export class BalanceService {
     userId: string,
     amount: Prisma.Decimal | number | string,
     meta?: Prisma.InputJsonValue,
+    tx?: Prisma.TransactionClient,
   ) {
     const decimalAmount = this.ensurePositive(amount);
 
-    await this.prisma.$transaction(async (tx) => {
-      const balance = await this.ensureUserBalance(userId, tx);
+    const runner = async (client: Prisma.TransactionClient) => {
+      const balance = await this.ensureUserBalance(userId, client);
       const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
 
       if (currentHold.lt(decimalAmount)) {
@@ -145,7 +166,7 @@ export class BalanceService {
 
       const nextHold = currentHold.minus(decimalAmount);
 
-      await tx.userBalance.update({
+      await client.userBalance.update({
         where: { userId },
         data: { holdBalance: nextHold },
       });
@@ -155,8 +176,17 @@ export class BalanceService {
         type: TransactionType.HOLD_REMOVE,
         amount: decimalAmount,
         meta,
-        tx,
+        tx: client,
       });
+    };
+
+    if (tx) {
+      await runner(tx);
+      return this.ensureUserBalance(userId, tx);
+    }
+
+    await this.prisma.$transaction(async (client) => {
+      await runner(client);
     });
 
     return this.ensureUserBalance(userId);

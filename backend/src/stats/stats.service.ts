@@ -482,11 +482,10 @@ export class StatsService {
       case 'SKLAD_ADMIN':
         orderWhere.status = {
           in: [
-            OrderStatus.ASSIGNED,
-            OrderStatus.IN_DELIVERY,
+              OrderStatus.PACKING,
+              OrderStatus.SHIPPED,
             OrderStatus.DELIVERED,
             OrderStatus.RETURNED,
-            OrderStatus.ARCHIVED,
           ],
         };
         activityWhere.user = {
@@ -784,24 +783,17 @@ export class StatsService {
 
     return [
       {
-        key: 'new',
-        label: 'Yangi',
-        status: OrderStatus.NEW,
-        count: getCount(OrderStatus.NEW),
+        key: 'packing',
+        label: 'Qadoqlash jarayonida',
+        status: OrderStatus.PACKING,
+        count: getCount(OrderStatus.PACKING),
         color: 'info',
       },
       {
-        key: 'assigned',
-        label: 'Operator belgilandi',
-        status: OrderStatus.ASSIGNED,
-        count: getCount(OrderStatus.ASSIGNED),
-        color: 'info',
-      },
-      {
-        key: 'in_delivery',
-        label: 'Yetkazilmoqda',
-        status: OrderStatus.IN_DELIVERY,
-        count: getCount(OrderStatus.IN_DELIVERY),
+        key: 'shipped',
+        label: 'Yo‘lda',
+        status: OrderStatus.SHIPPED,
+        count: getCount(OrderStatus.SHIPPED),
         color: 'info',
       },
       {
@@ -824,13 +816,6 @@ export class StatsService {
         status: 'RECONTACT',
         count: recontactCount,
         color: 'warning',
-      },
-      {
-        key: 'archived',
-        label: 'Arxiv',
-        status: OrderStatus.ARCHIVED,
-        count: getCount(OrderStatus.ARCHIVED),
-        color: 'muted',
       },
     ];
   }
@@ -1004,8 +989,8 @@ export class StatsService {
       operatorId: { not: null },
       status: {
         in: [
-          OrderStatus.ASSIGNED,
-          OrderStatus.IN_DELIVERY,
+            OrderStatus.PACKING,
+            OrderStatus.SHIPPED,
           OrderStatus.DELIVERED,
           OrderStatus.RETURNED,
         ],
