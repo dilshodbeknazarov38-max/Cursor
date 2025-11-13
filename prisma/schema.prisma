@@ -363,6 +363,8 @@ model Lead {
   name             String?
   status           LeadStatus  @default(NEW)
   notes            String?
+  sourceIp         String?
+  userAgent        String?
   flow             Flow        @relation(fields: [flowId], references: [id], onDelete: Cascade)
   product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   targetolog       User        @relation("LeadTargetolog", fields: [targetologId], references: [id], onDelete: Cascade)
@@ -374,6 +376,7 @@ model Lead {
   @@index([operatorId])
   @@index([productId])
   @@index([status])
+  @@index([sourceIp])
 }
 
 model Order {
@@ -471,4 +474,12 @@ model PasswordResetToken {
   usedAt     DateTime?
 
   @@index([expiresAt])
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

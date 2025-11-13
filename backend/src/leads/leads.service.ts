@@ -81,6 +81,8 @@ export class LeadsService {
         name: dto.name?.trim() || null,
         notes: dto.notes?.trim() || null,
         status: LeadStatus.NEW,
+        sourceIp: context.ip ?? null,
+        userAgent: context.userAgent ?? null,
       },
       include: {
         flow: {

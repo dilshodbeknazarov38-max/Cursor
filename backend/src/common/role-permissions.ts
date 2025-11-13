@@ -9,6 +9,7 @@ export type RolePermission = {
 export const ROLE_PERMISSIONS: Record<Role, RolePermission[]> = {
   [Role.SUPER_ADMIN]: [
     { label: 'Platforma', href: '/dashboard/superadmin', description: 'Tizimning umumiy boshqaruvi' },
+    { label: 'Analitika', href: '/dashboard/superadmin/analytics', description: 'Global statistika va trendlar' },
     { label: 'Foydalanuvchilar', href: '/dashboard/superadmin/users', description: 'Barcha rollarni va userlarni boshqarish' },
     { label: 'Moliya', href: '/dashboard/superadmin/finance', description: 'Global balans, payouts, tranzaksiyalar' },
     { label: 'Payoutlar', href: '/dashboard/superadmin/finance', description: 'Payout so‘rovlari boshqaruvi' },

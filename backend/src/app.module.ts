@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { ActivityModule } from '@/activity/activity.module';
+import { AdminAnalyticsModule } from '@/admin-analytics/admin-analytics.module';
 import { AuthModule } from '@/auth/auth.module';
 import { BalanceModule } from '@/balance/balance.module';
 import { BalancesModule } from '@/balances/balances.module';
@@ -22,18 +23,20 @@ import { StatsModule } from '@/stats/stats.module';
 import { TransactionsModule } from '@/transactions/transactions.module';
 import { UsersModule } from '@/users/users.module';
 import { FlowsModule } from '@/flows/flows.module';
+import { FraudModule } from '@/fraud/fraud.module';
+import { SystemSettingsModule } from '@/system-settings/system-settings.module';
 import { WarehouseModule } from '@/warehouse/warehouse.module';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      validate,
-      load: [APP_CONFIG],
-    }),
+    imports: [
+      ConfigModule.forRoot({
+        isGlobal: true,
+        validate,
+        load: [APP_CONFIG],
+      }),
       ThrottlerModule.forRoot([
         {
           ttl: 60,
@@ -55,10 +58,13 @@ import { AppService } from './app.service';
       PayoutModule,
       ActivityModule,
       BalancesModule,
-        TransactionsModule,
+      TransactionsModule,
       FlowsModule,
-        WarehouseModule,
-  ],
+      WarehouseModule,
+      AdminAnalyticsModule,
+      FraudModule,
+      SystemSettingsModule,
+    ],
   controllers: [AppController],
   providers: [
     AppService,
