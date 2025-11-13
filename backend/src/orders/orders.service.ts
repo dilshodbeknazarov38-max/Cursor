@@ -323,6 +323,11 @@ export class OrdersService {
         ? new Prisma.Decimal(order.product.cpaTargetolog)
         : null;
 
+    const operatorAmount =
+      order.product?.cpaOperator !== null && order.product?.cpaOperator !== undefined
+        ? new Prisma.Decimal(order.product.cpaOperator)
+        : null;
+
     if (dto.status === OrderStatus.DELIVERED && order.leadId) {
       if (order.lead?.status !== LeadStatus.TASDIQLANGAN) {
         await this.prisma.lead.update({
@@ -332,10 +337,26 @@ export class OrdersService {
       }
 
       if (rewardAmount && rewardAmount.gt(0)) {
-        await this.balanceService.releaseHoldToMain(order.targetologId, rewardAmount, {
-          orderId: id,
-          leadId: order.leadId,
-        });
+        const balanceSnapshot = await this.balanceService.ensureUserBalance(order.targetologId);
+        const currentHold = new Prisma.Decimal(balanceSnapshot.holdBalance ?? 0);
+        if (currentHold.gte(rewardAmount)) {
+          await this.balanceService.releaseHoldToMain(order.targetologId, rewardAmount, {
+            orderId: id,
+            leadId: order.leadId,
+          });
+        }
+      }
+
+      if (operatorAmount && operatorAmount.gt(0) && order.operatorId) {
+        const operatorBalance = await this.balanceService.ensureUserBalance(order.operatorId);
+        const operatorHold = new Prisma.Decimal(operatorBalance.holdBalance ?? 0);
+        if (operatorHold.gte(operatorAmount)) {
+          await this.balanceService.releaseHoldToMain(order.operatorId, operatorAmount, {
+            orderId: id,
+            leadId: order.leadId,
+            role: 'OPERATOR',
+          });
+        }
       }
     }
 
@@ -354,6 +375,19 @@ export class OrdersService {
           await this.balanceService.removeHold(order.targetologId, rewardAmount, {
             orderId: id,
             leadId: order.leadId,
+            reason: 'ORDER_RETURNED',
+          });
+        }
+      }
+
+      if (operatorAmount && operatorAmount.gt(0) && order.operatorId) {
+        const operatorBalance = await this.balanceService.ensureUserBalance(order.operatorId);
+        const operatorHold = new Prisma.Decimal(operatorBalance.holdBalance ?? 0);
+        if (operatorHold.gte(operatorAmount)) {
+          await this.balanceService.removeHold(order.operatorId, operatorAmount, {
+            orderId: id,
+            leadId: order.leadId,
+            role: 'OPERATOR',
             reason: 'ORDER_RETURNED',
           });
         }

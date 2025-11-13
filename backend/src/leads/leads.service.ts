@@ -155,6 +155,30 @@ export class LeadsService {
           ? new Prisma.Decimal(lead.product.cpaTargetolog)
           : null;
 
+      const orderWithOperator = await this.prisma.order.findFirst({
+        where: {
+          leadId: id,
+          operatorId: { not: null },
+        },
+        select: {
+          operatorId: true,
+          product: {
+            select: {
+              cpaOperator: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      const operatorAmount =
+        orderWithOperator?.product?.cpaOperator !== null &&
+        orderWithOperator?.product?.cpaOperator !== undefined
+          ? new Prisma.Decimal(orderWithOperator.product.cpaOperator)
+          : null;
+
       if (
         dto.status === LeadStatus.TASDIQLANGAN &&
         previousStatus !== LeadStatus.TASDIQLANGAN &&
@@ -177,6 +201,39 @@ export class LeadsService {
           await this.balanceService.removeHold(updated.targetologId, holdAmount, {
             leadId: id,
             productId: lead.product.id,
+            reason: 'LEAD_REJECTED',
+          });
+        }
+      }
+
+      if (
+        dto.status === LeadStatus.TASDIQLANGAN &&
+        previousStatus !== LeadStatus.TASDIQLANGAN &&
+        operatorAmount &&
+        operatorAmount.gt(0) &&
+        orderWithOperator?.operatorId
+      ) {
+        await this.balanceService.addHoldBalance(orderWithOperator.operatorId, operatorAmount, {
+          leadId: id,
+          productId: lead.product.id,
+          role: 'OPERATOR',
+        });
+      } else if (
+        dto.status === LeadStatus.RAD_ETILGAN &&
+        previousStatus === LeadStatus.TASDIQLANGAN &&
+        operatorAmount &&
+        operatorAmount.gt(0) &&
+        orderWithOperator?.operatorId
+      ) {
+        const operatorBalance = await this.balanceService.ensureUserBalance(
+          orderWithOperator.operatorId,
+        );
+        const operatorHold = new Prisma.Decimal(operatorBalance.holdBalance ?? 0);
+        if (operatorHold.gte(operatorAmount)) {
+          await this.balanceService.removeHold(orderWithOperator.operatorId, operatorAmount, {
+            leadId: id,
+            productId: lead.product.id,
+            role: 'OPERATOR',
             reason: 'LEAD_REJECTED',
           });
         }
