@@ -50,16 +50,31 @@ export class AuthService {
         'Davom etish uchun “Men robot emasman” ni tasdiqlang.',
       );
     }
-    if (payload.parol !== payload.parolTasdiq) {
+
+    if (!payload.termsAccepted) {
+      throw new BadRequestException(
+        'Davom etish uchun shartlar va maxfiylik siyosatini qabul qiling.',
+      );
+    }
+
+    if (payload.password !== payload.passwordConfirm) {
       throw new BadRequestException('Parollar mos kelmadi.');
     }
 
-    const safeUser = await this.usersService.createTargetologist({
-      firstName: payload.ism,
-      nickname: payload.nickname,
-      phone: payload.telefon,
-      password: payload.parol,
-    });
+    const safeUser = await this.usersService.createSelfRegisteredUser(
+      {
+        firstName: payload.firstName.trim(),
+        lastName: payload.lastName.trim(),
+        email: payload.email.trim().toLowerCase(),
+        phone: payload.phone.trim(),
+        password: payload.password,
+        roleSlug: payload.role,
+        referralCode: payload.referralCode?.trim() || null,
+      },
+      {
+        nickname: this.composeNickname(payload.firstName, payload.lastName),
+      },
+    );
 
     const tokens = await this.issueTokens(safeUser, false);
 
@@ -70,6 +85,9 @@ export class AuthService {
       device: context?.userAgent,
       meta: {
         phone: safeUser.phone,
+        email: safeUser.email ?? null,
+        role: safeUser.role?.slug ?? null,
+        referralCode: safeUser.referralCode ?? null,
       },
     });
 
@@ -386,5 +404,13 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private composeNickname(firstName: string, lastName?: string) {
+    const parts = [firstName, lastName ?? ''].map((part) =>
+      part?.trim().replace(/\s+/g, '-') ?? '',
+    );
+    const base = parts.filter(Boolean).join('.') || firstName;
+    return base.replace(/[^A-Za-z0-9._-]/g, '').toLowerCase();
   }
 }

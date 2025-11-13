@@ -6,10 +6,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { label: "Bosh sahifa", href: "#" },
+  { label: "Home", href: "#hero" },
   { label: "Mahsulotlar", href: "#products" },
   { label: "Targetologlar", href: "#targetologists" },
-  { label: "To‘lovlar", href: "#payments" },
+  { label: "To‘lovlar", href: "#stats" },
   { label: "Kontakt", href: "#contact" },
 ];
 
@@ -17,7 +17,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="w-full border-b border-neutral-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-50 w-full border-b border-white/20 bg-white/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <Link
           href="/"
@@ -37,10 +37,17 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="hidden items-center gap-3 md:flex">
-          <Button asChild variant="default">
+          <Button
+            asChild
+            variant="ghost"
+            className="text-sm font-semibold text-neutral-700 hover:text-neutral-900"
+          >
             <Link href="/kirish">Kirish</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button
+            asChild
+            className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-sky-600 text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-sky-700"
+          >
             <Link href="/royxatdan-otish">Ro‘yxatdan o‘tish</Link>
           </Button>
         </div>
@@ -67,10 +74,17 @@ export function SiteHeader() {
               </a>
             ))}
             <div className="mt-3 flex flex-col gap-3">
-              <Button asChild variant="default">
+              <Button
+                asChild
+                variant="ghost"
+                className="justify-center text-neutral-700 hover:text-neutral-900"
+              >
                 <Link href="/kirish">Kirish</Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button
+                asChild
+                className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-sky-600 text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:via-emerald-700 hover:to-sky-700"
+              >
                 <Link href="/royxatdan-otish">Ro‘yxatdan o‘tish</Link>
               </Button>
             </div>

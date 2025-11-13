@@ -20,7 +20,7 @@ const LABELS: { key: keyof CounterProps["counts"]; label: string }[] = [
 
 export function StatsCounters({ counts }: CounterProps) {
   return (
-    <section className="bg-white py-16">
+    <section id="stats" className="bg-white py-16">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold text-neutral-900 sm:text-4xl">

@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-white via-neutral-50 to-neutral-100">
+    <section
+      id="hero"
+      className="relative overflow-hidden bg-gradient-to-b from-white via-neutral-50 to-neutral-100"
+    >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-10 px-4 py-16 text-center sm:px-6 lg:flex-row lg:items-center lg:gap-16 lg:text-left">
         <div className="flex-1 space-y-6">
           <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
@@ -32,7 +35,7 @@ export function HeroSection() {
               size="lg"
               className="border-neutral-300 bg-white hover:bg-neutral-100"
             >
-              <Link href="#about">Ko‘proq ma’lumot</Link>
+                <Link href="#features">Ko‘proq ma’lumot</Link>
             </Button>
           </div>
         </div>

@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 
 export function CallToActionSection() {
   return (
-    <section className="bg-gradient-to-r from-emerald-600 to-sky-600 py-16 text-white">
+    <section
+      id="cta"
+      className="bg-gradient-to-r from-emerald-600 to-sky-600 py-16 text-white"
+    >
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-8 px-4 text-center sm:px-6 lg:flex-row lg:text-left">
         <div>
           <h2 className="text-3xl font-semibold sm:text-4xl">

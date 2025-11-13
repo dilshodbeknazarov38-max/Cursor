@@ -64,12 +64,18 @@ model User {
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   firstName        String
+  lastName         String?
+  email            String?              @unique
   nickname         String
   phone            String               @unique
   passwordHash     String
   status           UserStatus           @default(ACTIVE)
   lastLoginAt      DateTime?
   blockedAt        DateTime?
+  referralCode     String?
+  termsAcceptedAt  DateTime?
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
   roleId           String
   role             Role                 @relation(fields: [roleId], references: [id], onDelete: Restrict)
   refreshTokens    RefreshToken[]

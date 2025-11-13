@@ -42,6 +42,11 @@ const DEFAULT_ROLES = [
     description: 'O‘zining lidlari, statistika va to‘lovlarini ko‘radi.',
   },
   {
+    name: 'Sotuvchi',
+    slug: 'SOTUVCHI',
+    description: 'Mahsulotlar, buyurtmalar va balansini kuzatadi.',
+  },
+  {
     name: 'Operator',
     slug: 'OPERATOR',
     description: 'Biriktirilgan buyurtmalar ustida ishlaydi.',
@@ -96,6 +101,7 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   SELLER_ADMIN: ['MANAGE_SELLERS', 'VIEW_STATS'],
   SKLAD_ADMIN: ['MANAGE_WAREHOUSE', 'HANDLE_ORDERS'],
   TARGETOLOG: ['VIEW_LEADS', 'VIEW_STATS', 'VIEW_PAYOUTS'],
+  SOTUVCHI: ['VIEW_STATS', 'VIEW_PAYOUTS'],
   OPERATOR: ['HANDLE_ORDERS', 'VIEW_LEADS'],
 };
 
