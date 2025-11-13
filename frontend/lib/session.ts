@@ -50,6 +50,11 @@ export function setSession(payload: SessionPayload) {
     window.localStorage.setItem("cpa.refreshToken", payload.refreshToken);
     window.localStorage.setItem("cpa.role", payload.role);
     window.localStorage.setItem("cpa.userId", payload.userId);
+    if (payload.rememberMe) {
+      window.localStorage.setItem("cpa.rememberMe", "1");
+    } else {
+      window.localStorage.removeItem("cpa.rememberMe");
+    }
   } catch {
     // LocalStorage mavjud bo‘lmasa, e’tibor bermaymiz.
   }
@@ -70,6 +75,7 @@ export function clearSession() {
     window.localStorage.removeItem("cpa.refreshToken");
     window.localStorage.removeItem("cpa.role");
     window.localStorage.removeItem("cpa.userId");
+    window.localStorage.removeItem("cpa.rememberMe");
   } catch {
     // LocalStorage mavjud bo‘lmasa.
   }
@@ -83,4 +89,25 @@ export function getClientAccessToken(): string | null {
     .split("; ")
     .find((entry) => entry.startsWith(`${ACCESS_COOKIE}=`));
   return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+}
+
+export function getClientRefreshToken(): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const cookie = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(`${REFRESH_COOKIE}=`));
+  return cookie ? decodeURIComponent(cookie.split("=")[1]) : null;
+}
+
+export function getRememberMePreference(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem("cpa.rememberMe") === "1";
+  } catch {
+    return false;
+  }
 }

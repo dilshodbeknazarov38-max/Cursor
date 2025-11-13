@@ -10,6 +10,8 @@ import type { StringValue } from 'ms';
 import { createHash, randomBytes } from 'crypto';
 
 import { ActivityService } from '@/activity/activity.service';
+import { ROLE_PERMISSIONS, type RolePermission } from '@/common/role-permissions';
+import { Role as AppRole } from '@/common/roles';
 import { durationToSeconds } from '@/common/utils/duration.util';
 import { PrismaService } from '@/prisma/prisma.service';
 import { SafeUser, UsersService } from '@/users/users.service';
@@ -34,6 +36,52 @@ type RequestContext = {
   userAgent?: string;
 };
 
+type AuthUserResponse = {
+  id: string;
+  email: string | null;
+  phone: string;
+  firstName: string;
+  lastName: string | null;
+  role: string;
+  roleName: string;
+  roleRoute: string;
+};
+
+const DEFAULT_ROLE_SLUG = 'TARGETOLOG';
+
+const ROLE_ROUTE_MAP: Record<string, string> = {
+  SUPER_ADMIN: 'superadmin',
+  ADMIN: 'admin',
+  TARGET_ADMIN: 'target-admin',
+  OPER_ADMIN: 'oper-admin',
+  SKLAD_ADMIN: 'sklad-admin',
+  TAMINOTCHI: 'taminotchi',
+  TARGETOLOG: 'targetolog',
+  OPERATOR: 'operator',
+};
+
+const ROLE_SLUG_TO_ENUM: Record<string, AppRole> = {
+  SUPER_ADMIN: AppRole.SUPER_ADMIN,
+  ADMIN: AppRole.ADMIN,
+  TARGET_ADMIN: AppRole.TARGET_ADMIN,
+  OPER_ADMIN: AppRole.OPER_ADMIN,
+  SKLAD_ADMIN: AppRole.SKLAD_ADMIN,
+  TAMINOTCHI: AppRole.TAMINOTCHI,
+  TARGETOLOG: AppRole.TARGETOLOG,
+  OPERATOR: AppRole.OPERATOR,
+};
+
+const ROLE_NAME_FALLBACK: Record<string, string> = {
+  SUPER_ADMIN: AppRole.SUPER_ADMIN,
+  ADMIN: AppRole.ADMIN,
+  TARGET_ADMIN: AppRole.TARGET_ADMIN,
+  OPER_ADMIN: AppRole.OPER_ADMIN,
+  SKLAD_ADMIN: AppRole.SKLAD_ADMIN,
+  TAMINOTCHI: AppRole.TAMINOTCHI,
+  TARGETOLOG: AppRole.TARGETOLOG,
+  OPERATOR: AppRole.OPERATOR,
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -55,17 +103,16 @@ export class AuthService {
       throw new BadRequestException('Parollar mos kelmadi.');
     }
 
-    const safeUser = await this.usersService.createSelfRegisteredUser(
-      {
-        firstName: payload.firstName.trim(),
-        phone: payload.phone.trim(),
-        nickname: payload.nickname.trim(),
-        password: payload.password,
-        referralCode: payload.referralCode?.trim() || null,
-      },
-    );
+    const safeUser = await this.usersService.createSelfRegisteredUser({
+      firstName: payload.firstName.trim(),
+      phone: payload.phone.trim(),
+      nickname: payload.nickname.trim(),
+      password: payload.password,
+      referralCode: payload.referralCode?.trim() || null,
+    });
 
     const tokens = await this.issueTokens(safeUser, false);
+    const authUser = this.mapToAuthUser(safeUser);
 
     await this.activityService.log({
       userId: safeUser.id,
@@ -75,13 +122,14 @@ export class AuthService {
       meta: {
         phone: safeUser.phone,
         nickname: safeUser.nickname,
-        role: safeUser.role?.slug ?? 'TARGETOLOG',
+        role: safeUser.role?.slug ?? DEFAULT_ROLE_SLUG,
       },
     });
 
     return {
       message: 'Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi.',
-      user: safeUser,
+      user: authUser,
+      permissions: this.permissionsForRole(authUser.role),
       ...tokens,
     };
   }
@@ -146,6 +194,7 @@ export class AuthService {
       safeUser,
       payload.rememberMe ?? false,
     );
+    const authUser = this.mapToAuthUser(safeUser);
 
     await this.usersService.markLastLogin(user.id);
 
@@ -161,7 +210,8 @@ export class AuthService {
 
     return {
       message: 'Kirish muvaffaqiyatli.',
-      user: safeUser,
+      user: authUser,
+      permissions: this.permissionsForRole(authUser.role),
       ...tokens,
     };
   }
@@ -202,10 +252,12 @@ export class AuthService {
 
     const user = await this.usersService.findById(decoded.sub);
     const tokens = await this.issueTokens(user, true);
+    const authUser = this.mapToAuthUser(user);
 
     return {
       message: 'Tokenlar yangilandi.',
-      user,
+      user: authUser,
+      permissions: this.permissionsForRole(authUser.role),
       ...tokens,
     };
   }
@@ -280,6 +332,7 @@ export class AuthService {
 
     const user = await this.usersService.findById(storedToken.userId);
     const tokens = await this.issueTokens(user, false);
+    const authUser = this.mapToAuthUser(user);
 
     await this.activityService.log({
       userId: storedToken.userId,
@@ -291,7 +344,8 @@ export class AuthService {
 
     return {
       message: 'Parol muvaffaqiyatli yangilandi.',
-      user,
+      user: authUser,
+      permissions: this.permissionsForRole(authUser.role),
       ...tokens,
     };
   }
@@ -314,6 +368,53 @@ export class AuthService {
     return {
       message: 'Tizimdan chiqish muvaffaqiyatli yakunlandi.',
     };
+  }
+
+  async getProfile(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('Foydalanuvchi aniqlanmadi.');
+    }
+
+    const safeUser = await this.usersService.findById(userId);
+    const authUser = this.mapToAuthUser(safeUser);
+
+    return {
+      user: authUser,
+      permissions: this.permissionsForRole(authUser.role),
+    };
+  }
+
+  private normalizeRoleSlug(roleSlug?: string | null): string {
+    const slug = (roleSlug ?? DEFAULT_ROLE_SLUG)
+      .toString()
+      .trim()
+      .replace(/[^A-Za-z0-9]+/g, '_')
+      .replace(/_+/g, '_')
+      .toUpperCase();
+    return ROLE_ROUTE_MAP[slug] ? slug : DEFAULT_ROLE_SLUG;
+  }
+
+  private mapToAuthUser(user: SafeUser): AuthUserResponse {
+    const slug = this.normalizeRoleSlug(user.role?.slug);
+    const roleRoute = ROLE_ROUTE_MAP[slug] ?? ROLE_ROUTE_MAP[DEFAULT_ROLE_SLUG];
+    const roleName =
+      user.role?.name ?? ROLE_NAME_FALLBACK[slug] ?? ROLE_NAME_FALLBACK[DEFAULT_ROLE_SLUG];
+
+    return {
+      id: user.id,
+      email: user.email ?? null,
+      phone: user.phone,
+      firstName: user.firstName,
+      lastName: user.lastName ?? null,
+      role: slug,
+      roleName,
+      roleRoute,
+    };
+  }
+
+  private permissionsForRole(roleSlug: string): RolePermission[] {
+    const roleEnum = ROLE_SLUG_TO_ENUM[roleSlug] ?? ROLE_SLUG_TO_ENUM[DEFAULT_ROLE_SLUG];
+    return ROLE_PERMISSIONS[roleEnum] ?? [];
   }
 
   private async issueTokens(
@@ -344,7 +445,7 @@ export class AuthService {
         : '7d'
     ) as StringValue;
 
-    const roleSlug = user.role?.slug ?? 'TARGETOLOG';
+      const roleSlug = this.normalizeRoleSlug(user.role?.slug);
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(

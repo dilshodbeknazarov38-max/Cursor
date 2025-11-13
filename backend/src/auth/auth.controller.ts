@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -58,6 +59,12 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() payload: ResetPasswordDto) {
     return this.authService.resetPassword(payload);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Req() req: Request & { user?: { sub?: string } }) {
+    return this.authService.getProfile(req.user?.sub ?? '');
   }
 
   private extractContext(req: Request) {
