@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { ActivityModule } from '@/activity/activity.module';
 import { AuthModule } from '@/auth/auth.module';
+import { BalancesModule } from '@/balances/balances.module';
 import { APP_CONFIG } from '@/config/app.config';
 import { validate } from '@/config/env.validation';
 import { LeadsModule } from '@/leads/leads.module';
@@ -39,13 +40,14 @@ import { AppService } from './app.service';
     RolesModule,
     StatsModule,
     PermissionsModule,
-    AuthModule,
-    ProductsModule,
-    LeadsModule,
-    OrdersModule,
-    PayoutsModule,
-    NotificationsModule,
-    ActivityModule,
+      AuthModule,
+      ProductsModule,
+      LeadsModule,
+      OrdersModule,
+      PayoutsModule,
+      NotificationsModule,
+      ActivityModule,
+      BalancesModule,
   ],
   controllers: [AppController],
   providers: [

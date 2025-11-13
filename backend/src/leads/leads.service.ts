@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
+import { BalancesService } from '@/balances/balances.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -20,6 +21,8 @@ import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 type AuthContext = {
   userId: string;
   role: string;
+  ip?: string | null;
+  device?: string | null;
 };
 
 @Injectable()
@@ -28,6 +31,7 @@ export class LeadsService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
+    private readonly balancesService: BalancesService,
   ) {}
 
   async create(dto: CreateLeadDto, context: AuthContext) {
@@ -66,6 +70,8 @@ export class LeadsService {
     await this.activityService.log({
       userId: context.userId,
       action: 'Yangi lead yaratildi.',
+      ip: context.ip,
+      device: context.device,
       meta: {
         leadId: lead.id,
         productId: lead.productId,
@@ -73,6 +79,10 @@ export class LeadsService {
       },
     });
 
+    await this.balancesService.evaluateLeadIpAbuse(
+      targetologId,
+      context.ip ?? null,
+    );
     await this.notifyTargetAdmin(
       `Yangi lead yaratildi: ${lead.product.name}`,
       lead.targetologId,
@@ -135,6 +145,12 @@ export class LeadsService {
       where: { id },
       data: { status: dto.status },
     });
+
+    if (dto.status === LeadStatus.TASDIQLANGAN) {
+      await this.balancesService.handleLeadApproved(id, context.userId);
+    } else if (dto.status === LeadStatus.RAD_ETILGAN) {
+      await this.balancesService.handleLeadCancelled(id, context.userId);
+    }
 
     await this.activityService.log({
       userId: context.userId,

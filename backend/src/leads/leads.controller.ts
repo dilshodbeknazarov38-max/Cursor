@@ -41,6 +41,8 @@ export class LeadsController {
     return this.leadsService.create(dto, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
+      ip: req.ip ?? undefined,
+      device: req.headers['user-agent'] ?? undefined,
     });
   }
 

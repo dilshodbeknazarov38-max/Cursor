@@ -29,36 +29,34 @@ import { API_BASE_URL } from "@/lib/api";
 
 const registerSchema = z
   .object({
-    ism: z
+    firstName: z
       .string()
-      .min(1, "Ismingizni kiriting.")
-      .min(2, "Ism kamida 2 ta belgi bo‘lishi kerak."),
+      .min(2, "Ism kamida 2 ta belgi bo‘lishi kerak.")
+      .max(60, "Ism 60 belgidan oshmasligi kerak."),
     nickname: z
       .string()
-      .min(1, "Nickname kiriting.")
-      .min(3, "Nickname kamida 3 ta belgi bo‘lishi kerak."),
-    telefon: z
+      .min(3, "Nickname kamida 3 ta belgi bo‘lishi kerak.")
+      .max(40, "Nickname 40 belgidan oshmasligi kerak."),
+    phone: z
       .string()
       .min(1, "Telefon raqamingizni kiriting.")
       .regex(
         /^\+998\d{9}$/,
         "Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak."
       ),
-    parol: z
+    password: z
       .string()
       .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
-    parolTasdiq: z
-      .string()
-      .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
+    passwordConfirm: z.string(),
     captcha: z
       .boolean()
       .refine((value) => value === true, {
         message: "Davom etish uchun “Men robot emasman” belgilang.",
-    }),
+      }),
   })
-  .refine((data) => data.parol === data.parolTasdiq, {
+  .refine((data) => data.password === data.passwordConfirm, {
     message: "Parollar bir-biriga mos kelmadi.",
-    path: ["parolTasdiq"],
+    path: ["passwordConfirm"],
   });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -71,11 +69,11 @@ export function RegisterForm() {
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
-      ism: "",
+      firstName: "",
       nickname: "",
-      telefon: "+998",
-      parol: "",
-      parolTasdiq: "",
+      phone: "+998",
+      password: "",
+      passwordConfirm: "",
       captcha: false,
     },
   });
@@ -83,6 +81,7 @@ export function RegisterForm() {
   const onSubmit = async (values: RegisterFormValues) => {
     setServerError(null);
     setSuccessMessage(null);
+
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
@@ -90,11 +89,11 @@ export function RegisterForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ism: values.ism,
+          firstName: values.firstName,
           nickname: values.nickname,
-          telefon: values.telefon,
-          parol: values.parol,
-          parolTasdiq: values.parolTasdiq,
+          phone: values.phone,
+          password: values.password,
+          passwordConfirm: values.passwordConfirm,
           captcha: values.captcha,
         }),
       });
@@ -109,19 +108,21 @@ export function RegisterForm() {
         return;
       }
 
-      setSuccessMessage("Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi.");
+      setSuccessMessage(
+        "Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi. Endi telefon raqamingiz orqali tizimga kiring."
+      );
       form.reset({
-        ism: "",
+        firstName: "",
         nickname: "",
-          telefon: "+998",
-          parol: "",
-          parolTasdiq: "",
+        phone: "+998",
+        password: "",
+        passwordConfirm: "",
         captcha: false,
       });
 
       setTimeout(() => {
         router.push("/kirish");
-      }, 1200);
+      }, 1500);
     } catch (error) {
       console.error("Register error", error);
       setServerError("Serverga ulanib bo‘lmadi. Keyinroq urinib ko‘ring.");
@@ -131,13 +132,13 @@ export function RegisterForm() {
   return (
     <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-16">
       <Card className="w-full max-w-xl border-neutral-200 bg-white shadow-lg">
-        <CardHeader>
+        <CardHeader className="space-y-3">
           <CardTitle className="text-2xl font-semibold text-neutral-900">
             Ro‘yxatdan o‘tish
           </CardTitle>
           <CardDescription className="text-base text-neutral-600">
-            Ma’lumotlaringizni to‘ldiring va CPAMaRKeT.Uz platformasidan
-            foydalanishni boshlang.
+            Oddiy formani to‘ldiring va Targetolog sifatida hisob yarating.
+            Telefon raqamingiz login sifatida ishlatiladi.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -147,12 +148,16 @@ export function RegisterForm() {
           >
             <FormField
               control={form.control}
-              name="ism"
+              name="firstName"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Ism</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ismingiz" {...field} />
+                    <Input
+                      placeholder="Ismingiz"
+                      autoComplete="given-name"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -165,22 +170,46 @@ export function RegisterForm() {
                 <FormItem>
                   <FormLabel>Nickname</FormLabel>
                   <FormControl>
-                    <Input placeholder="Masalan, TargetGuru" {...field} />
+                    <Input
+                      placeholder="Sayt ichidagi ko‘rinadigan nom"
+                      autoComplete="nickname"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telefon raqam</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="+998901234567"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid gap-6 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="telefon"
+                name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefon raqam</FormLabel>
+                    <FormLabel>Parol</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="+998901234567"
-                        inputMode="tel"
+                        type="password"
+                        placeholder="Kamida 8 ta belgi"
+                        autoComplete="new-password"
                         {...field}
                       />
                     </FormControl>
@@ -188,40 +217,31 @@ export function RegisterForm() {
                   </FormItem>
                 )}
               />
-              <div className="grid gap-6 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="parol"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Parol</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="********" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="parolTasdiq"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Parolni tasdiqlash</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="********" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="passwordConfirm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Parolni tasdiqlash</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Parolni qayta kiriting"
+                        autoComplete="new-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="captcha"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50/70 px-4 py-3">
+                  <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
@@ -235,7 +255,7 @@ export function RegisterForm() {
                         Men robot emasman
                       </FormLabel>
                       <p className="text-sm text-neutral-600">
-                        Ro‘yxatdan o‘tishdan avval tasdiqlang.
+                        Davom etishdan oldin tasdiqlang.
                       </p>
                     </div>
                   </div>
@@ -262,7 +282,7 @@ export function RegisterForm() {
             </Button>
           </form>
         </Form>
-        <CardFooter className="flex flex-col items-center gap-2 border-t border-neutral-200/80 pt-6">
+        <CardFooter className="flex items-center justify-center border-t border-neutral-200/80 px-6 py-4">
           <p className="text-sm text-neutral-600">
             Allaqachon hisobingiz bormi?{" "}
             <Link

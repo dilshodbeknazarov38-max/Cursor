@@ -61,6 +61,30 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   ADMIN_NICKNAME?: string;
+
+  @IsOptional()
+  @IsString()
+  TELEGRAM_BOT_TOKEN?: string;
+
+  @IsOptional()
+  @IsString()
+  TELEGRAM_CHAT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYOUT_MIN_AMOUNT?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYOUT_DAILY_AMOUNT_LIMIT?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYOUT_MONTHLY_AMOUNT_LIMIT?: string;
+
+  @IsOptional()
+  @IsString()
+  PAYOUT_DAILY_REQUEST_LIMIT?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

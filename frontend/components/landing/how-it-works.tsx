@@ -10,7 +10,7 @@ const STEPS = [
 
 export function HowItWorksSection() {
   return (
-    <section className="bg-neutral-50 py-16">
+    <section id="how-it-works" className="bg-neutral-50 py-16">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-semibold text-neutral-900 sm:text-4xl">

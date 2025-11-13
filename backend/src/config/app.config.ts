@@ -14,4 +14,14 @@ export const APP_CONFIG = registerAs('app', () => ({
     process.env.FORGOT_PASSWORD_TOKEN_TTL_MINUTES ?? '10',
     10,
   ),
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN ?? null,
+    chatId: process.env.TELEGRAM_CHAT_ID ?? null,
+  },
+  payoutLimits: {
+    minAmount: Number(process.env.PAYOUT_MIN_AMOUNT ?? 0),
+    dailyAmountLimit: Number(process.env.PAYOUT_DAILY_AMOUNT_LIMIT ?? 0),
+    monthlyAmountLimit: Number(process.env.PAYOUT_MONTHLY_AMOUNT_LIMIT ?? 0),
+    dailyRequestLimit: Number(process.env.PAYOUT_DAILY_REQUEST_LIMIT ?? 0),
+  },
 }));

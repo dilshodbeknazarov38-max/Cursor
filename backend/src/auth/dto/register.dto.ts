@@ -1,6 +1,6 @@
 import {
   IsBoolean,
-  IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   MinLength,
@@ -8,26 +8,30 @@ import {
 
 export class RegisterDto {
   @IsString()
-  @IsNotEmpty({ message: 'Ismni kiriting.' })
-  ism!: string;
+  @MinLength(2, { message: 'Ism kamida 2 ta belgi bo‘lishi kerak.' })
+  firstName!: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Nickname kiriting.' })
+  @MinLength(3, { message: 'Nickname kamida 3 ta belgi bo‘lishi kerak.' })
   nickname!: string;
 
   @IsString()
   @Matches(/^\+998\d{9}$/, {
     message: 'Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak.',
   })
-  telefon!: string;
+  phone!: string;
 
   @IsString()
   @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
-  parol!: string;
+  password!: string;
 
   @IsString()
   @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
-  parolTasdiq!: string;
+  passwordConfirm!: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 
   @IsBoolean()
   captcha!: boolean;

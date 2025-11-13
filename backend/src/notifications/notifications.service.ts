@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NotificationType, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
@@ -12,7 +13,12 @@ type CreateNotificationPayload = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async create(payload: CreateNotificationPayload) {
     return this.prisma.notification.create({
@@ -90,5 +96,42 @@ export class NotificationsService {
       message: 'Barcha bildirishnomalar ko‘rilgan deb belgilandi.',
       updated: count,
     };
+  }
+
+  async sendTelegramMessage(message: string) {
+    const botToken =
+      this.configService.get<string>('app.telegram.botToken') ?? undefined;
+    const chatId =
+      this.configService.get<string>('app.telegram.chatId') ?? undefined;
+
+    if (!botToken || !chatId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'Markdown',
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const body = await response.text();
+        this.logger.warn(
+          `Telegram yuborilmadi: status=${response.status}, body=${body}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Telegram xabarini yuborishda xatolik', error as Error);
+    }
   }
 }

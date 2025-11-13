@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -38,16 +39,53 @@ export class UsersService {
     });
   }
 
-  async createTargetologist(payload: CreateUserDto): Promise<SafeUser> {
-    await this.ensureRoleExists('TARGETOLOG', 'Targetolog');
+  async createSelfRegisteredUser(payload: {
+    firstName: string;
+    nickname: string;
+    phone: string;
+    password: string;
+    roleSlug?: 'TARGETOLOG' | 'TAMINOTCHI';
+    email?: string | null;
+    lastName?: string | null;
+    referralCode?: string | null;
+  }): Promise<SafeUser> {
+    const allowedRoles: Record<'TARGETOLOG' | 'TAMINOTCHI', string> = {
+      TARGETOLOG: 'Targetolog',
+      TAMINOTCHI: 'Ta’minotchi',
+    };
 
-    const existing = await this.prisma.user.findUnique({
-      where: { phone: payload.phone },
-    });
+      const normalizedRole = (payload.roleSlug ?? 'TARGETOLOG').toUpperCase() as
+        | 'TARGETOLOG'
+        | 'TAMINOTCHI';
 
-    if (existing) {
+    if (!(normalizedRole in allowedRoles)) {
+      throw new BadRequestException(
+        'Tanlangan rolni ro‘yxatdan o‘tish orqali olish mumkin emas.',
+      );
+    }
+
+    await this.ensureRoleExists(normalizedRole, allowedRoles[normalizedRole]);
+
+    const [existingByPhone, existingByEmail] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { phone: payload.phone },
+        }),
+        payload.email
+          ? this.prisma.user.findUnique({
+              where: { email: payload.email },
+            })
+          : Promise.resolve(null),
+    ]);
+
+    if (existingByPhone) {
       throw new ConflictException(
         'Ushbu telefon raqami allaqachon ro‘yxatdan o‘tgan.',
+      );
+    }
+
+    if (existingByEmail) {
+      throw new ConflictException(
+        'Ushbu email manzili allaqachon ro‘yxatdan o‘tgan.',
       );
     }
 
@@ -57,17 +95,26 @@ export class UsersService {
     );
 
     const role = await this.prisma.role.findUniqueOrThrow({
-      where: { slug: 'TARGETOLOG' },
+      where: { slug: normalizedRole },
     });
+
+    const nickname =
+      payload.nickname?.trim().length > 0
+        ? payload.nickname.trim()
+        : this.generateNickname(payload.firstName, payload.lastName ?? undefined);
 
     const user = await this.prisma.user.create({
       data: {
         firstName: payload.firstName,
-        nickname: payload.nickname,
+        lastName: payload.lastName ?? null,
+        email: payload.email ?? null,
+        nickname,
         phone: payload.phone,
         passwordHash,
         roleId: role.id,
         status: UserStatus.ACTIVE,
+        referralCode: payload.referralCode ?? null,
+        termsAcceptedAt: new Date(),
       },
       include: { role: true },
     });
@@ -85,13 +132,26 @@ export class UsersService {
       );
     }
 
-    const existing = await this.prisma.user.findUnique({
-      where: { phone: payload.phone },
-    });
+    const [existingByPhone, existingByEmail] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { phone: payload.phone },
+      }),
+      payload.email
+        ? this.prisma.user.findUnique({
+            where: { email: payload.email },
+          })
+        : Promise.resolve(null),
+    ]);
 
-    if (existing) {
+    if (existingByPhone) {
       throw new ConflictException(
         'Ushbu telefon raqami allaqachon ro‘yxatdan o‘tgan.',
+      );
+    }
+
+    if (existingByEmail) {
+      throw new ConflictException(
+        'Ushbu email manzili allaqachon ro‘yxatdan o‘tgan.',
       );
     }
 
@@ -113,11 +173,16 @@ export class UsersService {
     const user = await this.prisma.user.create({
       data: {
         firstName: payload.firstName,
-        nickname: payload.nickname,
+        lastName: payload.lastName ?? null,
+        email: payload.email ?? null,
+        nickname:
+          payload.nickname ??
+          this.generateNickname(payload.firstName, payload.lastName ?? ''),
         phone: payload.phone,
         passwordHash,
         roleId: role.id,
         status: UserStatus.ACTIVE,
+        referralCode: payload.referralCode ?? null,
       },
       include: { role: true },
     });
@@ -306,5 +371,13 @@ export class UsersService {
 
   listRoles(): Promise<Role[]> {
     return this.prisma.role.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  private generateNickname(firstName: string, lastName?: string) {
+    const base = `${firstName}.${lastName ?? ''}`
+      .replace(/\s+/g, '-')
+      .replace(/[^A-Za-z0-9._-]/g, '')
+      .toLowerCase();
+    return base.length > 3 ? base : `${base}${Math.floor(Math.random() * 999)}`;
   }
 }

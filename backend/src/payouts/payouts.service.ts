@@ -6,6 +6,7 @@ import {
 import { NotificationType, PayoutStatus, Prisma } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
+import { BalancesService } from '@/balances/balances.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -23,15 +24,31 @@ export class PayoutsService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
+    private readonly balancesService: BalancesService,
   ) {}
 
   async requestPayout(dto: CreatePayoutDto, context: AuthContext) {
-    const payout = await this.prisma.payout.create({
-      data: {
-        userId: context.userId,
-        amount: new Prisma.Decimal(dto.amount),
-        comment: dto.comment,
-      },
+    const payout = await this.prisma.$transaction(async (tx) => {
+      await this.balancesService.requestPayout(
+        context.userId,
+        new Prisma.Decimal(dto.amount),
+        {
+          cardNumber: dto.cardNumber,
+          cardHolder: dto.cardHolder,
+        },
+        context.userId,
+        tx,
+      );
+
+      return tx.payout.create({
+        data: {
+          userId: context.userId,
+          amount: new Prisma.Decimal(dto.amount),
+          comment: dto.comment,
+          cardNumber: dto.cardNumber,
+          cardHolder: dto.cardHolder,
+        },
+      });
     });
 
     await this.activityService.log({
@@ -81,7 +98,18 @@ export class PayoutsService {
       throw new ForbiddenException('To‘lov statusini o‘zgartirishga ruxsat yo‘q.');
     }
 
-    const payout = await this.prisma.payout.findUnique({ where: { id } });
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            nickname: true,
+            phone: true,
+          },
+        },
+      },
+    });
     if (!payout) {
       throw new NotFoundException('To‘lov so‘rovi topilmadi.');
     }
@@ -90,6 +118,15 @@ export class PayoutsService {
       where: { id },
       data: {
         status: dto.status,
+      },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            nickname: true,
+            phone: true,
+          },
+        },
       },
     });
 
@@ -102,14 +139,40 @@ export class PayoutsService {
       },
     });
 
-    await this.notificationsService.create({
-      toUserId: updated.userId,
-      message: `To‘lov so‘rovingiz holati: ${dto.status}`,
-      type: NotificationType.PAYOUT,
-      metadata: {
-        payoutId: updated.id,
-      },
-    });
+    if (dto.status === PayoutStatus.APPROVED) {
+      await this.balancesService.handlePayoutApproval(
+        {
+          id: updated.id,
+          userId: updated.userId,
+          amount: updated.amount,
+          cardNumber: updated.cardNumber ?? undefined,
+          cardHolder: updated.cardHolder ?? undefined,
+          user: updated.user ?? payout.user,
+        },
+        context.userId,
+      );
+    } else if (dto.status === PayoutStatus.REJECTED) {
+      await this.balancesService.handlePayoutRejection(
+        {
+          id: updated.id,
+          userId: updated.userId,
+          amount: updated.amount,
+          cardNumber: updated.cardNumber ?? undefined,
+          cardHolder: updated.cardHolder ?? undefined,
+          user: updated.user ?? payout.user,
+        },
+        context.userId,
+      );
+    } else {
+      await this.notificationsService.create({
+        toUserId: updated.userId,
+        message: `To‘lov so‘rovingiz holati: ${dto.status}`,
+        type: NotificationType.PAYOUT,
+        metadata: {
+          payoutId: updated.id,
+        },
+      });
+    }
 
     return {
       message: 'To‘lov statusi yangilandi.',

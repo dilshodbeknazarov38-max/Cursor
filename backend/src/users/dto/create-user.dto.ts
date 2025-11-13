@@ -4,14 +4,27 @@ export class CreateUserDto {
   @IsString()
   firstName!: string;
 
+  @IsOptional()
   @IsString()
-  nickname!: string;
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  nickname?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
 
   @IsString()
   phone!: string;
 
   @IsString()
   password!: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 
   @IsOptional()
   @IsString()

@@ -1,102 +1,155 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { UserStatus } from '@prisma/client';
+import {
+  BalanceAccountType,
+  BalanceTransactionType,
+  FraudCheckStatus,
+  LeadStatus,
+  OrderStatus,
+  PayoutStatus,
+  Prisma,
+  ProductStatus,
+  UserStatus,
+} from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
 const DEFAULT_ROLES = [
   {
-    name: 'Admin',
-    slug: 'ADMIN',
-    description: 'Tizimning barcha modul va foydalanuvchilarini boshqaradi.',
-  },
-  {
     name: 'Super Admin',
     slug: 'SUPER_ADMIN',
-    description: 'Foydalanuvchilar va hisobotlarni kuzatadi.',
+    description: 'Platforma egasi, barcha modullar va xavfsizlikni boshqaradi.',
   },
   {
-    name: 'Oper Admin',
-    slug: 'OPER_ADMIN',
-    description: 'Operatorlar va buyurtmalar jarayonini boshqaradi.',
+    name: 'Admin',
+    slug: 'ADMIN',
+    description: 'Platforma jarayonlarini va bo‘lim boshliqlarini boshqaradi.',
   },
   {
     name: 'Target Admin',
     slug: 'TARGET_ADMIN',
-    description: 'Targetologlar va ularning lidlarini boshqaradi.',
+    description: 'Targetologlar va reklama oqimlarini nazorat qiladi.',
   },
   {
-    name: 'Seller Admin',
-    slug: 'SELLER_ADMIN',
-    description: 'Sotuvchilar va ularning samaradorligini nazorat qiladi.',
+    name: 'Oper Admin',
+    slug: 'OPER_ADMIN',
+    description: 'Operatorlar jamoasini va qo‘ng‘iroqlarni boshqaradi.',
   },
   {
     name: 'Sklad Admin',
     slug: 'SKLAD_ADMIN',
-    description: 'Ombor va yetkazib berish jarayonini boshqaradi.',
+    description: 'Ombor, qadoqlash va logistika jarayonlarini yuritadi.',
   },
   {
-    name: 'Targetolog',
-    slug: 'TARGETOLOG',
-    description: 'O‘zining lidlari, statistika va to‘lovlarini ko‘radi.',
+    name: 'Ta’minotchi',
+    slug: 'TAMINOTCHI',
+    description: 'Mahsulot ta’minoti va qoldiqlarini boshqaradi.',
   },
   {
     name: 'Operator',
     slug: 'OPERATOR',
-    description: 'Biriktirilgan buyurtmalar ustida ishlaydi.',
+    description: 'Mijozlar bilan qo‘ng‘iroqlarni amalga oshiradi va buyurtmalarni tasdiqlaydi.',
+  },
+  {
+    name: 'Targetolog',
+    slug: 'TARGETOLOG',
+    description: 'Reklama oqimlari va leadlarni yuritadi.',
   },
 ];
 
 const DEFAULT_PERMISSIONS = [
+  { name: 'Platformani boshqarish', slug: 'MANAGE_PLATFORM' },
   { name: 'Foydalanuvchilarni boshqarish', slug: 'MANAGE_USERS' },
+  { name: 'Rollarni boshqarish', slug: 'MANAGE_ROLES' },
+  { name: 'Balanslarni boshqarish', slug: 'MANAGE_BALANCES' },
+  { name: 'Fraud tizimini boshqarish', slug: 'MANAGE_FRAUD' },
+  { name: 'Payoutlarni tasdiqlash', slug: 'APPROVE_PAYOUTS' },
   { name: 'Mahsulotlarni boshqarish', slug: 'MANAGE_PRODUCTS' },
+  { name: 'Leadlarni boshqarish', slug: 'MANAGE_LEADS' },
   { name: 'Buyurtmalarni boshqarish', slug: 'MANAGE_ORDERS' },
-  { name: 'To‘lovlarni boshqarish', slug: 'MANAGE_PAYMENTS' },
-  { name: 'Bildirishnomalarni boshqarish', slug: 'MANAGE_NOTIFICATIONS' },
-  { name: 'Foydalanuvchilarni ko‘rish', slug: 'VIEW_USERS' },
-  { name: 'Hisobotlarni ko‘rish', slug: 'VIEW_REPORTS' },
-  { name: 'Operatorlarni boshqarish', slug: 'MANAGE_OPERATORS' },
-  { name: 'Targetologlarni boshqarish', slug: 'MANAGE_TARGETOLOGS' },
-  { name: 'Lidlarni boshqarish', slug: 'MANAGE_LEADS' },
-  { name: 'Sotuvchilarni boshqarish', slug: 'MANAGE_SELLERS' },
-  { name: 'Omborni boshqarish', slug: 'MANAGE_WAREHOUSE' },
-  { name: 'Lidlarni ko‘rish', slug: 'VIEW_LEADS' },
-  { name: 'Statistikani ko‘rish', slug: 'VIEW_STATS' },
-  { name: 'To‘lovlarni ko‘rish', slug: 'VIEW_PAYOUTS' },
-  { name: 'Biriktirilgan buyurtmalarni boshqarish', slug: 'HANDLE_ORDERS' },
+  { name: 'Targetolog jamoasini boshqarish', slug: 'MANAGE_TARGET_TEAM' },
+  { name: 'Operator jamoasini boshqarish', slug: 'MANAGE_OPERATOR_TEAM' },
+  { name: 'Skladni boshqarish', slug: 'MANAGE_SKLAD' },
+  { name: 'Ta’minot jarayonini boshqarish', slug: 'MANAGE_SUPPLY' },
+  { name: 'Call loglarini ko‘rish', slug: 'VIEW_CALL_LOGS' },
+  { name: 'Targetolog balanslarini ko‘rish', slug: 'VIEW_TARGET_BALANCES' },
+  { name: 'Operator balanslarini ko‘rish', slug: 'VIEW_OPERATOR_BALANCES' },
+  { name: 'Loglarni ko‘rish', slug: 'VIEW_ACTIVITY_LOGS' },
+  { name: 'Leadlarni ko‘rish', slug: 'VIEW_LEADS' },
+  { name: 'Buyurtma statusini yangilash', slug: 'UPDATE_ORDER_STATUS' },
+  { name: 'O‘z mahsulotlarini boshqarish', slug: 'MANAGE_OWN_PRODUCTS' },
+  { name: 'O‘z buyurtmalarini ko‘rish', slug: 'VIEW_OWN_ORDERS' },
+  { name: 'Shaxsiy balansni ko‘rish', slug: 'VIEW_SELF_BALANCE' },
+  { name: 'Payout so‘rovi yuborish', slug: 'REQUEST_PAYOUT' },
+  { name: 'Lead yaratish', slug: 'CREATE_LEADS' },
+  { name: 'Operator qo‘ng‘iroqlarini ko‘rish', slug: 'VIEW_OPERATOR_CALLS' },
+  { name: 'Dashboardni ko‘rish', slug: 'VIEW_DASHBOARD' },
 ];
 
 const ROLE_PERMISSION_MAP: Record<string, string[]> = {
+  SUPER_ADMIN: DEFAULT_PERMISSIONS.map((permission) => permission.slug),
   ADMIN: [
     'MANAGE_USERS',
+    'MANAGE_ROLES',
+    'MANAGE_BALANCES',
+    'MANAGE_FRAUD',
+    'APPROVE_PAYOUTS',
     'MANAGE_PRODUCTS',
+    'MANAGE_LEADS',
     'MANAGE_ORDERS',
-    'MANAGE_PAYMENTS',
-    'MANAGE_NOTIFICATIONS',
-    'VIEW_REPORTS',
-    'MANAGE_OPERATORS',
-    'MANAGE_TARGETOLOGS',
-    'MANAGE_LEADS',
-    'MANAGE_SELLERS',
-    'MANAGE_WAREHOUSE',
+    'MANAGE_TARGET_TEAM',
+    'MANAGE_OPERATOR_TEAM',
+    'MANAGE_SKLAD',
+    'MANAGE_SUPPLY',
+    'VIEW_ACTIVITY_LOGS',
     'VIEW_LEADS',
-    'VIEW_STATS',
-    'VIEW_PAYOUTS',
-    'HANDLE_ORDERS',
+    'VIEW_DASHBOARD',
   ],
-  SUPER_ADMIN: ['VIEW_USERS', 'VIEW_REPORTS'],
-  OPER_ADMIN: ['MANAGE_OPERATORS', 'MANAGE_ORDERS', 'HANDLE_ORDERS'],
   TARGET_ADMIN: [
-    'MANAGE_TARGETOLOGS',
+    'VIEW_DASHBOARD',
+    'MANAGE_TARGET_TEAM',
     'MANAGE_LEADS',
+    'VIEW_TARGET_BALANCES',
     'VIEW_LEADS',
-    'VIEW_STATS',
   ],
-  SELLER_ADMIN: ['MANAGE_SELLERS', 'VIEW_STATS'],
-  SKLAD_ADMIN: ['MANAGE_WAREHOUSE', 'HANDLE_ORDERS'],
-  TARGETOLOG: ['VIEW_LEADS', 'VIEW_STATS', 'VIEW_PAYOUTS'],
-  OPERATOR: ['HANDLE_ORDERS', 'VIEW_LEADS'],
+  OPER_ADMIN: [
+    'VIEW_DASHBOARD',
+    'MANAGE_OPERATOR_TEAM',
+    'MANAGE_ORDERS',
+    'VIEW_OPERATOR_BALANCES',
+    'VIEW_OPERATOR_CALLS',
+    'UPDATE_ORDER_STATUS',
+  ],
+  SKLAD_ADMIN: [
+    'VIEW_DASHBOARD',
+    'MANAGE_SKLAD',
+    'MANAGE_ORDERS',
+    'UPDATE_ORDER_STATUS',
+  ],
+  TAMINOTCHI: [
+    'VIEW_DASHBOARD',
+    'MANAGE_SUPPLY',
+    'MANAGE_OWN_PRODUCTS',
+    'VIEW_OWN_ORDERS',
+    'VIEW_SELF_BALANCE',
+    'REQUEST_PAYOUT',
+  ],
+  OPERATOR: [
+    'VIEW_DASHBOARD',
+    'VIEW_LEADS',
+    'UPDATE_ORDER_STATUS',
+    'VIEW_OPERATOR_CALLS',
+    'VIEW_SELF_BALANCE',
+    'REQUEST_PAYOUT',
+  ],
+  TARGETOLOG: [
+    'VIEW_DASHBOARD',
+    'CREATE_LEADS',
+    'VIEW_LEADS',
+    'VIEW_SELF_BALANCE',
+    'REQUEST_PAYOUT',
+  ],
 };
 
 const PASSWORD_SALT_ROUNDS = 10;
@@ -110,6 +163,7 @@ export class AppService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedAccessControl();
+    await this.seedDemoData();
   }
 
   getHello(): string {
@@ -170,6 +224,253 @@ export class AppService implements OnModuleInit {
       }
 
       await this.ensureDefaultAdmin(tx);
+    });
+  }
+
+  private async seedDemoData() {
+    const existingTransactions = await this.prisma.balanceTransaction.count();
+    if (existingTransactions > 0) {
+      return;
+    }
+
+    const roles = await this.prisma.role.findMany({
+      where: {
+        slug: {
+          in: ['TARGETOLOG', 'TAMINOTCHI', 'OPERATOR'],
+        },
+      },
+    });
+    const roleMap = new Map(roles.map((role) => [role.slug, role]));
+
+    const targetRole = roleMap.get('TARGETOLOG');
+    const supplierRole = roleMap.get('TAMINOTCHI');
+    const operatorRole = roleMap.get('OPERATOR');
+
+    if (!targetRole || !supplierRole || !operatorRole) {
+      return;
+    }
+
+    const demoPasswordHash = await bcrypt.hash(
+      'Demo1234!',
+      PASSWORD_SALT_ROUNDS,
+    );
+
+    const targetUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000001' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: targetRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Targetolog',
+        nickname: 'demo_targetolog',
+        phone: '+998900000001',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: targetRole.id,
+      },
+    });
+
+    const supplierUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000002' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: supplierRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Ta’minotchi',
+        nickname: 'demo_taminotchi',
+        phone: '+998900000002',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: supplierRole.id,
+      },
+    });
+
+    const operatorUser = await this.prisma.user.upsert({
+      where: { phone: '+998900000003' },
+      update: {
+        passwordHash: demoPasswordHash,
+        roleId: operatorRole.id,
+        status: UserStatus.ACTIVE,
+      },
+      create: {
+        firstName: 'Demo Operator',
+        nickname: 'demo_operator',
+        phone: '+998900000003',
+        passwordHash: demoPasswordHash,
+        status: UserStatus.ACTIVE,
+        roleId: operatorRole.id,
+      },
+    });
+
+    const productSlug = `demo-product-${supplierUser.id.slice(0, 8)}`;
+    const product = await this.prisma.product.upsert({
+      where: { slug: productSlug },
+      update: {},
+      create: {
+        name: 'Demo mahsulot',
+        slug: productSlug,
+        category: 'Demo',
+        shortDescription: 'Demo mahsulot uchun qisqa tavsif.',
+        fullDescription: 'Demo mahsulotning to‘liq tavsifi.',
+        price: new Prisma.Decimal('350000'),
+        cpaTargetolog: new Prisma.Decimal('150000'),
+        cpaOperator: new Prisma.Decimal('80000'),
+        mainImageUrl: '/static/placeholders/product.png',
+        smartLinkUrl: 'https://example.com/demo-product',
+        status: ProductStatus.ACTIVE,
+        sellerId: supplierUser.id,
+        tags: ['demo', 'mahsulot'],
+        trafficSources: ['facebook', 'instagram'],
+      },
+    });
+
+    const lead = await this.prisma.lead.create({
+      data: {
+        productId: product.id,
+        targetologId: targetUser.id,
+        status: LeadStatus.TASDIQLANGAN,
+        notes: 'Demo lid avtomatik yaratilgan.',
+      },
+    });
+
+    await this.prisma.order.create({
+      data: {
+        productId: product.id,
+        targetologId: targetUser.id,
+        operatorId: operatorUser.id,
+        leadId: lead.id,
+        status: OrderStatus.DELIVERED,
+        amount: new Prisma.Decimal('350000'),
+      },
+    });
+
+    const targetMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: targetUser.id,
+          type: BalanceAccountType.TARGETOLOG_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('250000'),
+      },
+      create: {
+        userId: targetUser.id,
+        type: BalanceAccountType.TARGETOLOG_MAIN,
+        amount: new Prisma.Decimal('250000'),
+      },
+    });
+
+    const operatorMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: operatorUser.id,
+          type: BalanceAccountType.OPERATOR_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('80000'),
+      },
+      create: {
+        userId: operatorUser.id,
+        type: BalanceAccountType.OPERATOR_MAIN,
+        amount: new Prisma.Decimal('80000'),
+      },
+    });
+
+    const supplierMainAccount = await this.prisma.balanceAccount.upsert({
+      where: {
+        userId_type: {
+          userId: supplierUser.id,
+          type: BalanceAccountType.SELLER_MAIN,
+        },
+      },
+      update: {
+        amount: new Prisma.Decimal('420000'),
+      },
+      create: {
+        userId: supplierUser.id,
+        type: BalanceAccountType.SELLER_MAIN,
+        amount: new Prisma.Decimal('420000'),
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: targetMainAccount.id,
+        userId: targetUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('150000'),
+        balanceBefore: new Prisma.Decimal('100000'),
+        balanceAfter: new Prisma.Decimal('250000'),
+        isCredit: true,
+        note: 'Demo lead sotildi.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: operatorMainAccount.id,
+        userId: operatorUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('80000'),
+        balanceBefore: new Prisma.Decimal('0'),
+        balanceAfter: new Prisma.Decimal('80000'),
+        isCredit: true,
+        note: 'Demo operator mukofoti.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.balanceTransaction.create({
+      data: {
+        accountId: supplierMainAccount.id,
+        userId: supplierUser.id,
+        type: BalanceTransactionType.LEAD_SOLD,
+        amount: new Prisma.Decimal('420000'),
+        balanceBefore: new Prisma.Decimal('0'),
+        balanceAfter: new Prisma.Decimal('420000'),
+        isCredit: true,
+        note: 'Demo ta’minotchi daromadi.',
+        metadata: {
+          demo: true,
+        },
+        leadId: lead.id,
+      },
+    });
+
+    await this.prisma.payout.create({
+      data: {
+        userId: targetUser.id,
+        amount: new Prisma.Decimal('200000'),
+        status: PayoutStatus.PENDING,
+        cardNumber: '8600123412341234',
+        cardHolder: 'DEMO TARGETOLOG',
+        comment: 'Demo payout so‘rovi',
+      },
+    });
+
+    await this.prisma.balanceFraudCheck.create({
+      data: {
+        userId: targetUser.id,
+        status: FraudCheckStatus.REVIEWING,
+        reason: 'Demo fraud kuzatuvi',
+        metadata: {
+          score: 35,
+          note: 'Demo ma’lumot',
+        },
+      },
     });
   }
 

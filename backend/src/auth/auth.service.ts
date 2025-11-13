@@ -50,16 +50,20 @@ export class AuthService {
         'Davom etish uchun “Men robot emasman” ni tasdiqlang.',
       );
     }
-    if (payload.parol !== payload.parolTasdiq) {
+
+    if (payload.password !== payload.passwordConfirm) {
       throw new BadRequestException('Parollar mos kelmadi.');
     }
 
-    const safeUser = await this.usersService.createTargetologist({
-      firstName: payload.ism,
-      nickname: payload.nickname,
-      phone: payload.telefon,
-      password: payload.parol,
-    });
+    const safeUser = await this.usersService.createSelfRegisteredUser(
+      {
+        firstName: payload.firstName.trim(),
+        phone: payload.phone.trim(),
+        nickname: payload.nickname.trim(),
+        password: payload.password,
+        referralCode: payload.referralCode?.trim() || null,
+      },
+    );
 
     const tokens = await this.issueTokens(safeUser, false);
 
@@ -70,6 +74,8 @@ export class AuthService {
       device: context?.userAgent,
       meta: {
         phone: safeUser.phone,
+        nickname: safeUser.nickname,
+        role: safeUser.role?.slug ?? 'TARGETOLOG',
       },
     });
 
@@ -93,12 +99,24 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.BLOCKED) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: hisob bloklangan.',
+        ip: context?.ip,
+        device: context?.userAgent,
+      });
       throw new ForbiddenException(
         'Hisobingiz bloklangan. Administrator bilan bog‘laning.',
       );
     }
 
     if (user.status === UserStatus.INACTIVE) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: hisob faol emas.',
+        ip: context?.ip,
+        device: context?.userAgent,
+      });
       throw new ForbiddenException(
         'Hisobingiz faol emas. Administrator bilan bog‘laning.',
       );
@@ -109,6 +127,15 @@ export class AuthService {
       payload.parol,
     );
     if (!isPasswordValid) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: noto‘g‘ri parol.',
+        ip: context?.ip,
+        device: context?.userAgent,
+        meta: {
+          rememberMe: payload.rememberMe ?? false,
+        },
+      });
       throw new UnauthorizedException('Login yoki parol noto‘g‘ri.');
     }
 

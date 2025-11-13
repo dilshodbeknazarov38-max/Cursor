@@ -26,7 +26,7 @@ export function TestimonialsSection({ items }: TestimonialsProps) {
   const current = items[index];
 
   return (
-    <section className="bg-neutral-900 py-16 text-white">
+    <section id="testimonials" className="bg-neutral-900 py-16 text-white">
       <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
         <div className="flex flex-col items-start justify-between gap-8 lg:flex-row">
           <div className="max-w-xl">
