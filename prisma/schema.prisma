@@ -25,6 +25,7 @@ enum ProductStatus {
   ACTIVE
   INACTIVE
   ARCHIVED
+  PENDING_APPROVAL
 }
 
 enum LeadStatus {
@@ -124,17 +125,31 @@ model RolePermission {
 }
 
 model Product {
-  id          String         @id @default(uuid())
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  name        String
-  description String?
-  price       Decimal        @db.Decimal(12, 2)
-  status      ProductStatus  @default(DRAFT)
-  sellerId    String
-  seller      User           @relation("ProductSeller", fields: [sellerId], references: [id], onDelete: Restrict)
-  leads       Lead[]
-  orders      Order[]
+  id               String        @id @default(uuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  name             String
+  slug             String        @unique
+  category         String
+  shortDescription String
+  fullDescription  String?
+  price            Decimal       @db.Decimal(12, 2)
+  cpaTargetolog    Decimal?      @db.Decimal(12, 2)
+  cpaOperator      Decimal?      @db.Decimal(12, 2)
+  mainImageUrl     String
+  creativeUrl      String?
+  seoTitle         String?
+  seoDescription   String?
+  tags             String[]
+  trafficSources   String[]
+  smartLinkUrl     String?
+  marketplaceId    String?
+  externalUrl      String?
+  status           ProductStatus @default(PENDING_APPROVAL)
+  sellerId         String
+  seller           User          @relation("ProductSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  leads            Lead[]
+  orders           Order[]
 
   @@index([sellerId])
   @@index([status])

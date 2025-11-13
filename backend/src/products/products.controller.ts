@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,10 +8,13 @@ import {
   Post,
   Query,
   Req,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
 import { Request } from 'express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 import { Roles } from '@/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -71,29 +75,71 @@ export class ProductsController {
     return this.productsService.findOne(id, req.user?.role ?? '');
   }
 
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'mainImage', maxCount: 1 },
+      { name: 'creative', maxCount: 1 },
+    ]),
+  )
   @Post()
-  @Roles('ADMIN', 'SELLER_ADMIN')
+  @Roles('ADMIN', 'SELLER_ADMIN', 'SUPER_ADMIN', 'SOTUVCHI')
   create(
     @Body() dto: CreateProductDto,
+    @UploadedFiles()
+    files: {
+      mainImage?: Express.Multer.File[];
+      creative?: Express.Multer.File[];
+    },
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.productsService.create(dto, {
-      userId: req.user?.sub ?? '',
-      role: req.user?.role ?? '',
-    });
+    const mainImage = files?.mainImage?.[0];
+    if (!mainImage) {
+      throw new BadRequestException('Asosiy rasm yuklash majburiy.');
+    }
+
+    return this.productsService.create(
+      dto,
+      {
+        userId: req.user?.sub ?? '',
+        role: req.user?.role ?? '',
+      },
+      {
+        mainImage,
+        creative: files?.creative?.[0],
+      },
+    );
   }
 
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'mainImage', maxCount: 1 },
+      { name: 'creative', maxCount: 1 },
+    ]),
+  )
   @Patch(':id')
-  @Roles('ADMIN', 'SELLER_ADMIN')
+  @Roles('ADMIN', 'SELLER_ADMIN', 'SUPER_ADMIN', 'SOTUVCHI')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
+    @UploadedFiles()
+    files: {
+      mainImage?: Express.Multer.File[];
+      creative?: Express.Multer.File[];
+    },
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.productsService.update(id, dto, {
-      userId: req.user?.sub ?? '',
-      role: req.user?.role ?? '',
-    });
+    return this.productsService.update(
+      id,
+      dto,
+      {
+        userId: req.user?.sub ?? '',
+        role: req.user?.role ?? '',
+      },
+      {
+        mainImage: files?.mainImage?.[0],
+        creative: files?.creative?.[0],
+      },
+    );
   }
 
   @Patch(':id/archive')
