@@ -1,4 +1,5 @@
 export enum Role {
+  SUPER_ADMIN = 'Super Admin',
   ADMIN = 'Admin',
   TARGET_ADMIN = 'Target Admin',
   OPER_ADMIN = 'Oper Admin',
@@ -9,6 +10,7 @@ export enum Role {
 }
 
 export const ALL_ROLES: Role[] = [
+  Role.SUPER_ADMIN,
   Role.ADMIN,
   Role.TARGET_ADMIN,
   Role.OPER_ADMIN,

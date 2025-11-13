@@ -5,6 +5,13 @@ type RoleMenuItem = {
 };
 
 const roleMenus: Record<string, RoleMenuItem[]> = {
+  superadmin: [
+    { label: 'Platforma', description: 'Umumiy boshqaruv', href: '/dashboard/superadmin' },
+    { label: 'Foydalanuvchilar', description: 'User va rollarni boshqarish', href: '/dashboard/superadmin/users' },
+    { label: 'Moliya', description: 'Balans va to‘lovlar', href: '/dashboard/superadmin/finance' },
+    { label: 'Fraud', description: 'Fraud monitoring', href: '/dashboard/superadmin/fraud' },
+    { label: 'Sozlamalar', description: 'System settings', href: '/dashboard/superadmin/settings' },
+  ],
   admin: [
     { label: 'Umumiy ko‘rinish', description: 'Asosiy metrikalar', href: '/dashboard/admin' },
     { label: 'Jamoadoshlar', description: 'Huquq va rollar', href: '/dashboard/admin/team' },
