@@ -40,6 +40,9 @@ export class PayoutService {
       throw new BadRequestException('Summani musbat qiymatda kiriting.');
     }
 
+    const sanitizedCardNumber = this.normalizeCardNumber(dto.cardNumber);
+    const normalizedCardHolder = this.normalizeCardHolder(dto.cardHolder);
+
     const payout = await this.prisma.$transaction(async (tx) => {
       const balance = await this.balanceService.ensureUserBalance(userId, tx);
       const mainBalance = new Prisma.Decimal(balance.mainBalance ?? 0);
@@ -51,39 +54,35 @@ export class PayoutService {
         data: {
           userId,
           amount: amountDecimal,
-          cardNumber: dto.cardNumber,
-          cardHolder: dto.cardHolder,
-          comment: dto.comment,
+          cardNumber: sanitizedCardNumber,
+          cardHolder: normalizedCardHolder,
+          comment: dto.comment?.trim() ?? null,
           status: PayoutStatus.PENDING,
         },
       });
 
-      await this.balanceService.adjustMainBalance(
-        userId,
-        amountDecimal,
-        'DECREASE',
-        tx,
-      );
+      await this.balanceService.adjustMainBalance(userId, amountDecimal, 'DECREASE', tx);
 
-      await this.transactionsService.record(
-        {
-          userId,
-          type: TransactionType.PAYOUT_REQUEST,
-          amount: amountDecimal,
-          meta: {
-            payoutId: createdPayout.id,
-            cardNumber: dto.cardNumber,
-          },
-          tx,
+      await this.transactionsService.record({
+        userId,
+        type: TransactionType.PAYOUT_REQUEST,
+        amount: amountDecimal,
+        meta: {
+          payoutId: createdPayout.id,
+          cardLast4: sanitizedCardNumber.slice(-4),
         },
-      );
+        tx,
+      });
 
       return createdPayout;
     });
 
+    const balance = await this.balanceService.getUserOverview(userId);
+
     return {
       message: 'To‘lov so‘rovi yuborildi.',
       payout: this.mapPayout(payout),
+      balance,
     };
   }
 
@@ -166,15 +165,21 @@ export class PayoutService {
         tx,
       });
 
-      return updated;
+      return {
+        payout: updated,
+        userId: payout.userId,
+      };
     });
+
+    const balance = await this.balanceService.getUserOverview(result.userId);
 
     // Placeholder for async notification integration
     console.log('[Payout] Telegram notify pending for approval:', id);
 
     return {
       message: 'Payout so‘rovi tasdiqlandi.',
-      payout: this.mapPayout(result),
+      payout: this.mapPayout(result.payout),
+      balance,
     };
   }
 
@@ -215,12 +220,18 @@ export class PayoutService {
         tx,
       });
 
-      return updated;
+      return {
+        payout: updated,
+        userId: payout.userId,
+      };
     });
+
+    const balance = await this.balanceService.getUserOverview(result.userId);
 
     return {
       message: 'Payout so‘rovi rad etildi va mablag‘ qaytarildi.',
-      payout: this.mapPayout(result),
+      payout: this.mapPayout(result.payout),
+      balance,
     };
   }
 
@@ -229,5 +240,21 @@ export class PayoutService {
       ...payout,
       amount: new Prisma.Decimal(payout.amount).toFixed(2),
     };
+  }
+
+  private normalizeCardNumber(cardNumber: string) {
+    const digitsOnly = cardNumber.replace(/\D/g, '');
+    if (digitsOnly.length !== 16) {
+      throw new BadRequestException('Karta raqami 16 ta raqamdan iborat bo‘lishi kerak.');
+    }
+    return digitsOnly;
+  }
+
+  private normalizeCardHolder(cardHolder: string) {
+    const normalized = cardHolder.trim().replace(/\s+/g, ' ');
+    if (normalized.length < 3 || normalized.length > 64) {
+      throw new BadRequestException('Karta egasi ismi 3-64 belgi oralig‘ida bo‘lishi kerak.');
+    }
+    return normalized.toUpperCase();
   }
 }

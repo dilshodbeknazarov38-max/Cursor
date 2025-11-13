@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 type BalanceApiResponse = {
   holdBalance: string | number;
   mainBalance: string | number;
+  availableForPayout?: string | number;
   transactions?: Array<{
     id: string;
     type: string;
@@ -36,6 +37,7 @@ type BalanceCardProps = {
   onBalanceChange?: (payload: {
     holdBalance: number;
     mainBalance: number;
+    availableForPayout: number;
   }) => void;
   className?: string;
 };
@@ -78,6 +80,7 @@ const BalanceCard = forwardRef<BalanceCardHandle, BalanceCardProps>(
     const [error, setError] = useState<string | null>(null);
     const [holdBalance, setHoldBalance] = useState(0);
     const [mainBalance, setMainBalance] = useState(0);
+    const [availableBalance, setAvailableBalance] = useState(0);
     const [transactions, setTransactions] = useState<BalanceTransaction[]>([]);
 
     const fetchBalance = async () => {
@@ -87,8 +90,10 @@ const BalanceCard = forwardRef<BalanceCardHandle, BalanceCardProps>(
         const response = await apiGet<BalanceApiResponse>('/balance/me');
         const hold = parseNumber(response.holdBalance);
         const main = parseNumber(response.mainBalance);
+        const available = parseNumber(response.availableForPayout ?? response.mainBalance);
         setHoldBalance(hold);
         setMainBalance(main);
+        setAvailableBalance(available);
         setTransactions(
           (response.transactions ?? []).map((tx) => ({
             id: tx.id,
@@ -99,7 +104,11 @@ const BalanceCard = forwardRef<BalanceCardHandle, BalanceCardProps>(
           })),
         );
 
-        onBalanceChange?.({ holdBalance: hold, mainBalance: main });
+        onBalanceChange?.({
+          holdBalance: hold,
+          mainBalance: main,
+          availableForPayout: available,
+        });
       } catch (fetchError) {
         if (fetchError instanceof Error) {
           setError(fetchError.message);
@@ -162,13 +171,25 @@ const BalanceCard = forwardRef<BalanceCardHandle, BalanceCardProps>(
               Tasdiqlanish jarayonidagi summalar.
             </p>
           </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+            Payout uchun mavjud
+          </p>
+          <p className="mt-2 text-3xl font-semibold text-slate-900">
+            {formatCurrency(availableBalance, 'UZS')}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Yechib olish so‘rovi uchun asosiy balansdagi summa.
+          </p>
+        </div>
         </>
       );
-    }, [error, holdBalance, loading, mainBalance]);
+    }, [availableBalance, error, holdBalance, loading, mainBalance]);
 
     return (
       <section className={cn('space-y-6', className)}>
-        <div className="grid gap-4 rounded-xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-sm sm:grid-cols-2">
+        <div className="grid gap-4 rounded-xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-6 shadow-sm sm:grid-cols-3">
           {content}
         </div>
 

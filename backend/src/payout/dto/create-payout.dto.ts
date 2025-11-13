@@ -15,7 +15,7 @@ export class CreatePayoutDto {
   amount!: number;
 
   @IsString()
-  @Length(8, 32, { message: 'Karta raqami 8-32 belgi oralig‘ida bo‘lishi kerak.' })
+  @Length(16, 16, { message: 'Karta raqami 16 ta raqamdan iborat bo‘lishi kerak.' })
   cardNumber!: string;
 
   @IsString()

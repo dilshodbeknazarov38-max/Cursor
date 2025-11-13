@@ -133,19 +133,8 @@ export default function SuperAdminFinancePage() {
         action === 'approve'
           ? `/admin/payouts/${payoutId}/approve`
           : `/admin/payouts/${payoutId}/reject`;
-      const response = await apiPut<{ payout: any }>(endpoint);
-
-      setPayouts((prev) =>
-        prev.map((row) =>
-          row.id === payoutId
-            ? {
-                ...row,
-                status: response.payout.status,
-                updatedAt: response.payout.updatedAt,
-              }
-            : row,
-        ),
-      );
+        await apiPut(endpoint);
+        await fetchPayouts();
 
       toast({
         title:

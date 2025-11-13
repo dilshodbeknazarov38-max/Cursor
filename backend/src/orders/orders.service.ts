@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
-import { BalancesService } from '@/balances/balances.service';
+import { BalanceService } from '@/balance/balance.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -49,7 +49,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
-    private readonly balancesService: BalancesService,
+    private readonly balanceService: BalanceService,
   ) {}
 
   async create(dto: CreateOrderDto, context: AuthContext) {
@@ -318,24 +318,46 @@ export class OrdersService {
       },
     });
 
+    const rewardAmount =
+      order.product?.cpaTargetolog !== null && order.product?.cpaTargetolog !== undefined
+        ? new Prisma.Decimal(order.product.cpaTargetolog)
+        : null;
+
     if (dto.status === OrderStatus.DELIVERED && order.leadId) {
-      await this.prisma.lead.update({
-        where: { id: order.leadId },
-        data: { status: LeadStatus.TASDIQLANGAN },
-      });
-      await this.balancesService.handleOrderDelivered(id, context.userId);
+      if (order.lead?.status !== LeadStatus.TASDIQLANGAN) {
+        await this.prisma.lead.update({
+          where: { id: order.leadId },
+          data: { status: LeadStatus.TASDIQLANGAN },
+        });
+      }
+
+      if (rewardAmount && rewardAmount.gt(0)) {
+        await this.balanceService.releaseHoldToMain(order.targetologId, rewardAmount, {
+          orderId: id,
+          leadId: order.leadId,
+        });
+      }
     }
 
     if (dto.status === OrderStatus.RETURNED && order.leadId) {
-      await this.prisma.lead.update({
-        where: { id: order.leadId },
-        data: { status: LeadStatus.RAD_ETILGAN },
-      });
-      await this.balancesService.handleLeadCancelled(
-        order.leadId,
-        context.userId,
-      );
-      await this.balancesService.handleOrderReturned(id, context.userId);
+      if (order.lead?.status !== LeadStatus.RAD_ETILGAN) {
+        await this.prisma.lead.update({
+          where: { id: order.leadId },
+          data: { status: LeadStatus.RAD_ETILGAN },
+        });
+      }
+
+      if (rewardAmount && rewardAmount.gt(0)) {
+        const balanceSnapshot = await this.balanceService.ensureUserBalance(order.targetologId);
+        const currentHold = new Prisma.Decimal(balanceSnapshot.holdBalance ?? 0);
+        if (currentHold.gte(rewardAmount)) {
+          await this.balanceService.removeHold(order.targetologId, rewardAmount, {
+            orderId: id,
+            leadId: order.leadId,
+            reason: 'ORDER_RETURNED',
+          });
+        }
+      }
     }
 
     await this.notificationsService.create({

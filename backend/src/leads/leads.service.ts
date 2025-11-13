@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 
 import { ActivityService } from '@/activity/activity.service';
+import { BalanceService } from '@/balance/balance.service';
 import { BalancesService } from '@/balances/balances.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -32,6 +33,7 @@ export class LeadsService {
     private readonly activityService: ActivityService,
     private readonly notificationsService: NotificationsService,
     private readonly balancesService: BalancesService,
+    private readonly balanceService: BalanceService,
   ) {}
 
   async create(dto: CreateLeadDto, context: AuthContext) {
@@ -135,41 +137,69 @@ export class LeadsService {
       throw new NotFoundException('Lead topilmadi.');
     }
 
-    if (!this.canUpdateStatus(context, lead)) {
-      throw new ForbiddenException(
-        'Lead statusini o‘zgartirish uchun ruxsatingiz yo‘q.',
-      );
-    }
+      if (!this.canUpdateStatus(context, lead)) {
+        throw new ForbiddenException(
+          'Lead statusini o‘zgartirish uchun ruxsatingiz yo‘q.',
+        );
+      }
 
-    const updated = await this.prisma.lead.update({
-      where: { id },
-      data: { status: dto.status },
-    });
+      const previousStatus = lead.status;
 
-    if (dto.status === LeadStatus.TASDIQLANGAN) {
-      await this.balancesService.handleLeadApproved(id, context.userId);
-    } else if (dto.status === LeadStatus.RAD_ETILGAN) {
-      await this.balancesService.handleLeadCancelled(id, context.userId);
-    }
+      const updated = await this.prisma.lead.update({
+        where: { id },
+        data: { status: dto.status },
+      });
 
-    await this.activityService.log({
-      userId: context.userId,
-      action: `Lead statusi yangilandi: ${dto.status}`,
-      meta: {
-        leadId: id,
-        status: dto.status,
-      },
-    });
+      const holdAmount =
+        lead.product?.cpaTargetolog !== null && lead.product?.cpaTargetolog !== undefined
+          ? new Prisma.Decimal(lead.product.cpaTargetolog)
+          : null;
 
-    await this.notificationsService.create({
-      toUserId: updated.targetologId,
-      message: `Sizning lead statusingiz yangilandi: ${dto.status}`,
-      type: NotificationType.LEAD,
-      metadata: {
-        leadId: updated.id,
-        productId: updated.productId,
-      },
-    });
+      if (
+        dto.status === LeadStatus.TASDIQLANGAN &&
+        previousStatus !== LeadStatus.TASDIQLANGAN &&
+        holdAmount &&
+        holdAmount.gt(0)
+      ) {
+        await this.balanceService.addHoldBalance(updated.targetologId, holdAmount, {
+          leadId: id,
+          productId: lead.product.id,
+        });
+      } else if (
+        dto.status === LeadStatus.RAD_ETILGAN &&
+        previousStatus === LeadStatus.TASDIQLANGAN &&
+        holdAmount &&
+        holdAmount.gt(0)
+      ) {
+        const currentBalance = await this.balanceService.ensureUserBalance(updated.targetologId);
+        const currentHold = new Prisma.Decimal(currentBalance.holdBalance ?? 0);
+        if (currentHold.gte(holdAmount)) {
+          await this.balanceService.removeHold(updated.targetologId, holdAmount, {
+            leadId: id,
+            productId: lead.product.id,
+            reason: 'LEAD_REJECTED',
+          });
+        }
+      }
+
+      await this.activityService.log({
+        userId: context.userId,
+        action: `Lead statusi yangilandi: ${dto.status}`,
+        meta: {
+          leadId: id,
+          status: dto.status,
+        },
+      });
+
+      await this.notificationsService.create({
+        toUserId: updated.targetologId,
+        message: `Sizning lead statusingiz yangilandi: ${dto.status}`,
+        type: NotificationType.LEAD,
+        metadata: {
+          leadId: updated.id,
+          productId: updated.productId,
+        },
+      });
 
     return {
       message: 'Lead statusi yangilandi.',

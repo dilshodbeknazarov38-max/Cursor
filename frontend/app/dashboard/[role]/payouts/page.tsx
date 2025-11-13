@@ -47,9 +47,14 @@ export default function RolePayoutsPage({ params }: RolePayoutPageProps) {
   const { toast } = useToast();
   const balanceRef = useRef<BalanceCardHandle>(null);
 
-  const [balance, setBalance] = useState<{ holdBalance: number; mainBalance: number }>({
+  const [balance, setBalance] = useState<{
+    holdBalance: number;
+    mainBalance: number;
+    availableForPayout: number;
+  }>({
     holdBalance: 0,
     mainBalance: 0,
+    availableForPayout: 0,
   });
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +118,7 @@ export default function RolePayoutsPage({ params }: RolePayoutPageProps) {
           </div>
           <Button
             onClick={() => setModalOpen(true)}
-            disabled={balance.mainBalance <= 0}
+            disabled={balance.availableForPayout <= 0}
           >
             Yechib olish so‘rovi
           </Button>

@@ -54,11 +54,13 @@ const PayoutModal = ({ open, onClose, mainBalance, onSuccess }: PayoutModalProps
   }, [open, onClose]);
 
   const amountNumber = useMemo(() => {
-    const value = Number(
-      form.amount.replace(/\s+/g, '').replace(',', '.'),
-    );
+    const value = Number(form.amount.replace(/\s+/g, '').replace(',', '.'));
     return Number.isFinite(value) ? value : 0;
   }, [form.amount]);
+  const numericCardNumber = useMemo(
+    () => form.cardNumber.replace(/\s+/g, ''),
+    [form.cardNumber],
+  );
 
   const validate = (): boolean => {
     const nextErrors: ValidationErrors = {};
@@ -69,10 +71,10 @@ const PayoutModal = ({ open, onClose, mainBalance, onSuccess }: PayoutModalProps
       nextErrors.amount = 'Summa asosiy balansdan oshib ketdi.';
     }
 
-    if (!form.cardNumber.trim()) {
+    if (!numericCardNumber) {
       nextErrors.cardNumber = 'Karta raqamini kiriting.';
-    } else if (form.cardNumber.replace(/\s+/g, '').length < 8) {
-      nextErrors.cardNumber = 'Karta raqami kamida 8 ta belgidan iborat bo‘lishi kerak.';
+    } else if (!/^\d{16}$/.test(numericCardNumber)) {
+      nextErrors.cardNumber = 'Karta raqami 16 ta raqamdan iborat bo‘lishi kerak.';
     }
 
     if (!form.cardHolder.trim()) {
@@ -101,12 +103,12 @@ const PayoutModal = ({ open, onClose, mainBalance, onSuccess }: PayoutModalProps
 
     try {
       setSubmitting(true);
-      await apiPost('/payouts', {
-        amount: Number(amountNumber.toFixed(2)),
-        cardNumber: form.cardNumber.trim(),
-        cardHolder: form.cardHolder.trim(),
-        comment: form.comment.trim() || undefined,
-      });
+    await apiPost('/payouts', {
+      amount: Number(amountNumber.toFixed(2)),
+      cardNumber: numericCardNumber,
+      cardHolder: form.cardHolder.trim(),
+      comment: form.comment.trim() || undefined,
+    });
 
       toast({
         title: 'So‘rov yuborildi',

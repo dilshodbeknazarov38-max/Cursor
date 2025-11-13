@@ -3,13 +3,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TransactionType } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
+import { TransactionsService } from '@/transactions/transactions.service';
 
 @Injectable()
 export class BalanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transactionsService: TransactionsService,
+  ) {}
 
   async getUserOverview(userId: string) {
     const [balance, transactions] = await Promise.all([
@@ -21,9 +25,13 @@ export class BalanceService {
       }),
     ]);
 
+    const hold = new Prisma.Decimal(balance.holdBalance ?? 0);
+    const main = new Prisma.Decimal(balance.mainBalance ?? 0);
+
     return {
-      holdBalance: balance.holdBalance.toFixed(2),
-      mainBalance: balance.mainBalance.toFixed(2),
+      holdBalance: hold.toFixed(2),
+      mainBalance: main.toFixed(2),
+      availableForPayout: main.toFixed(2),
       transactions: transactions.map((tx) => ({
         id: tx.id,
         type: tx.type,
@@ -55,16 +63,112 @@ export class BalanceService {
     return balance;
   }
 
+  async addHoldBalance(
+    userId: string,
+    amount: Prisma.Decimal | number | string,
+    meta?: Prisma.InputJsonValue,
+  ) {
+    const decimalAmount = this.ensurePositive(amount);
+
+    await this.prisma.$transaction(async (tx) => {
+      const balance = await this.ensureUserBalance(userId, tx);
+      const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
+      const nextHold = currentHold.plus(decimalAmount);
+
+      await tx.userBalance.update({
+        where: { userId },
+        data: { holdBalance: nextHold },
+      });
+
+      await this.transactionsService.record({
+        userId,
+        type: TransactionType.HOLD_ADD,
+        amount: decimalAmount,
+        meta,
+        tx,
+      });
+    });
+
+    return this.ensureUserBalance(userId);
+  }
+
+  async releaseHoldToMain(
+    userId: string,
+    amount: Prisma.Decimal | number | string,
+    meta?: Prisma.InputJsonValue,
+  ) {
+    const decimalAmount = this.ensurePositive(amount);
+
+    await this.prisma.$transaction(async (tx) => {
+      const balance = await this.ensureUserBalance(userId, tx);
+      const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
+
+      if (currentHold.lt(decimalAmount)) {
+        throw new BadRequestException('Hold balansda mablag‘ yetarli emas.');
+      }
+
+      const nextHold = currentHold.minus(decimalAmount);
+
+      await tx.userBalance.update({
+        where: { userId },
+        data: { holdBalance: nextHold },
+      });
+
+      await this.adjustMainBalance(userId, decimalAmount, 'INCREASE', tx);
+
+      await this.transactionsService.record({
+        userId,
+        type: TransactionType.HOLD_RELEASE,
+        amount: decimalAmount,
+        meta,
+        tx,
+      });
+    });
+
+    return this.ensureUserBalance(userId);
+  }
+
+  async removeHold(
+    userId: string,
+    amount: Prisma.Decimal | number | string,
+    meta?: Prisma.InputJsonValue,
+  ) {
+    const decimalAmount = this.ensurePositive(amount);
+
+    await this.prisma.$transaction(async (tx) => {
+      const balance = await this.ensureUserBalance(userId, tx);
+      const currentHold = new Prisma.Decimal(balance.holdBalance ?? 0);
+
+      if (currentHold.lt(decimalAmount)) {
+        throw new BadRequestException('Hold balansda yetarli mablag‘ topilmadi.');
+      }
+
+      const nextHold = currentHold.minus(decimalAmount);
+
+      await tx.userBalance.update({
+        where: { userId },
+        data: { holdBalance: nextHold },
+      });
+
+      await this.transactionsService.record({
+        userId,
+        type: TransactionType.HOLD_REMOVE,
+        amount: decimalAmount,
+        meta,
+        tx,
+      });
+    });
+
+    return this.ensureUserBalance(userId);
+  }
+
   async adjustMainBalance(
     userId: string,
     amount: Prisma.Decimal | number | string,
     direction: 'INCREASE' | 'DECREASE',
     tx: Prisma.TransactionClient,
   ) {
-    const decimalAmount = new Prisma.Decimal(amount);
-    if (decimalAmount.lte(0)) {
-      throw new BadRequestException('Summani musbat qiymatda kiriting.');
-    }
+    const decimalAmount = this.ensurePositive(amount);
 
     const balance = await this.ensureUserBalance(userId, tx);
     const current = new Prisma.Decimal(balance.mainBalance ?? 0);
@@ -81,5 +185,13 @@ export class BalanceService {
       where: { userId },
       data: { mainBalance: next },
     });
+  }
+
+  private ensurePositive(amount: Prisma.Decimal | number | string) {
+    const decimalAmount = new Prisma.Decimal(amount);
+    if (decimalAmount.lte(0)) {
+      throw new BadRequestException('Summani musbat qiymatda kiriting.');
+    }
+    return decimalAmount;
   }
 }
