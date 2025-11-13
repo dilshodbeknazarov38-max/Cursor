@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
+  LeadStatus,
+  NotificationType,
   OrderStatus,
   PayoutStatus,
   UserStatus,
@@ -13,6 +15,27 @@ type TrendPoint = {
   value: number;
 };
 
+type QuickAction = {
+  label: string;
+  href: string;
+};
+
+type OrdersByStatusItem = {
+  key: string;
+  label: string;
+  status: string;
+  count: number;
+  color: 'success' | 'info' | 'warning' | 'danger' | 'muted';
+};
+
+type TopPerformer = {
+  id: string;
+  name: string;
+  orders: number;
+  revenue?: number;
+  leads?: number;
+};
+
 type DashboardContext = {
   role: string;
   userId: string;
@@ -20,6 +43,28 @@ type DashboardContext = {
   orderWhere: Prisma.OrderWhereInput;
   payoutWhere: Prisma.PayoutWhereInput;
   activityWhere: Prisma.ActivityLogWhereInput;
+  notificationWhere: Prisma.NotificationWhereInput;
+  quickActions: QuickAction[];
+};
+
+type SummaryInput = {
+  leadsToday: number;
+  ordersToday: number;
+  pendingPayouts: number;
+  deliveredOrders: number;
+  deliveredRevenue: number;
+  approvedPayouts: number;
+  totalLeads: number;
+  totalUsers: number;
+  leadRecontactCount: number;
+  roleCounts?: {
+    targetologs: number;
+    sellers: number;
+    operators: number;
+  };
+  topTargetologCount?: number;
+  topSellerCount?: number;
+  topOperatorCount?: number;
 };
 
 const MONTH_LABELS = [
@@ -69,12 +114,21 @@ export class StatsService {
     const targetologUsers =
       topTargetologsRaw.length > 0
         ? await this.prisma.user.findMany({
-            where: { id: { in: topTargetologsRaw.map((item) => item.targetologId) } },
+            where: {
+              id: {
+                in: topTargetologsRaw
+                  .map((item) => item.targetologId)
+                  .filter((value): value is string => Boolean(value)),
+              },
+            },
             select: { id: true, firstName: true, nickname: true },
           })
         : [];
+
     const topTargetologs = topTargetologsRaw.map((record) => {
-      const user = targetologUsers.find((candidate) => candidate.id === record.targetologId);
+      const user = targetologUsers.find(
+        (candidate) => candidate.id === record.targetologId,
+      );
       return {
         userId: record.targetologId,
         fullName: user
@@ -118,9 +172,10 @@ export class StatsService {
   async getDashboardStats(roleSlug: string, userId: string) {
     const context = this.buildContext(roleSlug.toUpperCase(), userId);
 
-    const sixMonthsAgo = this.startOfMonth(this.addMonths(new Date(), -5));
-    const sevenDaysAgo = this.startOfDay(this.addDays(new Date(), -6));
-    const startOfToday = this.startOfDay(new Date());
+    const now = new Date();
+    const sixMonthsAgo = this.startOfMonth(this.addMonths(now, -5));
+    const sevenDaysAgo = this.startOfDay(this.addDays(now, -6));
+    const startOfToday = this.startOfDay(now);
 
     const [
       activeUsers,
@@ -134,6 +189,10 @@ export class StatsService {
       monthlyLeadsDates,
       monthlyOrdersDates,
       weeklyActivityDates,
+      leadRecontactCount,
+      ordersByStatusRaw,
+      recentActivityRaw,
+      notificationsRaw,
     ] = await Promise.all([
       this.prisma.user.count({ where: { status: UserStatus.ACTIVE } }),
       this.prisma.lead.count({ where: context.leadWhere }),
@@ -193,6 +252,53 @@ export class StatsService {
         },
         select: { createdAt: true },
       }),
+      this.prisma.lead.count({
+        where: {
+          ...context.leadWhere,
+          status: LeadStatus.QAYTA_ALOQA,
+        },
+      }),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: context.orderWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.activityLog.findMany({
+        where: context.activityWhere,
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              nickname: true,
+              role: { select: { slug: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.notification.findMany({
+        where: context.notificationWhere,
+        take: 20,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    const roleCounts = this.requiresRoleCounts(context.role)
+      ? await this.getRoleCounts()
+      : null;
+
+    const [topTargetologs, topSellers, topOperators] = await Promise.all([
+      this.requiresTopTargetologs(context.role)
+        ? this.fetchTopTargetologs(context.orderWhere)
+        : Promise.resolve([]),
+      this.requiresTopSellers(context.role)
+        ? this.fetchTopSellers(context.orderWhere)
+        : Promise.resolve([]),
+      this.requiresTopOperators(context.role)
+        ? this.fetchTopOperators(context.orderWhere)
+        : Promise.resolve([]),
     ]);
 
     const leadTrend = this.buildMonthlyTrend(
@@ -201,39 +307,76 @@ export class StatsService {
     const salesTrend = this.buildMonthlyTrend(
       monthlyOrdersDates.map((record) => record.createdAt),
     );
-    const activeTrend = this.buildWeeklyTrend(
+    const activityTrend = this.buildWeeklyTrend(
       weeklyActivityDates.map((record) => record.createdAt),
     );
 
-    const deliveredRevenueNumber = Number(
-      deliveredRevenue._sum.amount ?? 0,
-    );
-    const approvedPayoutNumber = Number(
-      approvedPayoutSum._sum.amount ?? 0,
-    );
-
-    const metrics = this.buildMetrics(context.role, {
+    const summaryCards = this.buildSummaryCards(context.role, {
       leadsToday,
       ordersToday,
       pendingPayouts,
       deliveredOrders: totalDeliveredOrders,
-      deliveredRevenue: deliveredRevenueNumber,
-      approvedPayouts: approvedPayoutNumber,
+      deliveredRevenue: Number(deliveredRevenue._sum.amount ?? 0),
+      approvedPayouts: Number(approvedPayoutSum._sum.amount ?? 0),
+      totalLeads,
+      totalUsers: activeUsers,
+      leadRecontactCount,
+      roleCounts: roleCounts ?? undefined,
+      topTargetologCount: topTargetologs.length,
+      topSellerCount: topSellers.length,
+      topOperatorCount: topOperators.length,
     });
+
+    const ordersByStatus = this.buildOrdersByStatus(
+      ordersByStatusRaw,
+      leadRecontactCount,
+    );
+
+    const recentActivity = recentActivityRaw.map((item) => ({
+      id: item.id,
+      message: item.action,
+      createdAt: item.createdAt,
+      user: item.user
+        ? {
+            id: item.user.id,
+            name: `${item.user.firstName} (${item.user.nickname})`,
+            role: item.user.role?.slug ?? null,
+          }
+        : null,
+    }));
+
+    const notifications = notificationsRaw.map((item) => ({
+      id: item.id,
+      message: item.message,
+      type: item.type,
+      seen: item.seen,
+      createdAt: item.createdAt,
+      metadata: item.metadata ?? null,
+    }));
 
     return {
       role: context.role,
-      metrics,
+      overview: {
+        totalUsers: activeUsers,
+        totalLeads,
+        deliveredOrders: totalDeliveredOrders,
+        roleCounts: roleCounts ?? undefined,
+      },
+      summaryCards,
       charts: {
         leads: leadTrend,
         sales: salesTrend,
-        active: activeTrend,
+        activity: activityTrend,
       },
-      summary: {
-        users: activeUsers,
-        leads: totalLeads,
-        sales: totalDeliveredOrders,
+      ordersByStatus,
+      topPerformers: {
+        targetologists: topTargetologs,
+        sellers: topSellers,
+        operators: topOperators,
       },
+      recentActivity,
+      quickActions: context.quickActions,
+      notifications,
     };
   }
 
@@ -242,32 +385,179 @@ export class StatsService {
     const orderWhere: Prisma.OrderWhereInput = {};
     const payoutWhere: Prisma.PayoutWhereInput = {};
     const activityWhere: Prisma.ActivityLogWhereInput = {};
+    const notificationWhere: Prisma.NotificationWhereInput = {};
+    const quickActions: QuickAction[] = [];
 
     const hasUser = Boolean(userId);
 
     switch (role) {
+      case 'ADMIN':
+        activityWhere.user = {
+          role: {
+            slug: {
+              in: ['OPERATOR', 'SKLAD_ADMIN'],
+            },
+          },
+        };
+        notificationWhere.type = {
+          in: [
+            NotificationType.SYSTEM,
+            NotificationType.ORDER,
+            NotificationType.LEAD,
+            NotificationType.PAYOUT,
+            NotificationType.USER,
+          ],
+        };
+        quickActions.push(
+          { label: 'Mahsulot qo‘shish', href: '/dashboard/admin/products/new' },
+          { label: 'Foydalanuvchi yaratish', href: '/dashboard/admin/users/create' },
+          { label: 'Buyurtmalarni boshqarish', href: '/dashboard/admin/orders' },
+          { label: 'Bildirishnoma yuborish', href: '/dashboard/admin/notifications' },
+        );
+        break;
+      case 'SUPER_ADMIN':
+        activityWhere.user = {
+          role: {
+            slug: {
+              in: ['ADMIN', 'SUPER_ADMIN'],
+            },
+          },
+        };
+        notificationWhere.type = {
+          in: [NotificationType.SYSTEM, NotificationType.USER, NotificationType.ORDER],
+        };
+        quickActions.push(
+          { label: 'Rollar va ruxsatlar', href: '/dashboard/super-admin/roles' },
+          { label: 'Hisobotlarni ko‘rish', href: '/dashboard/super-admin/reports' },
+        );
+        break;
+      case 'OPER_ADMIN':
+        activityWhere.user = {
+          role: {
+            slug: 'OPERATOR',
+          },
+        };
+        notificationWhere.OR = [
+          { type: NotificationType.ORDER },
+          { type: NotificationType.SYSTEM },
+        ];
+        quickActions.push(
+          { label: 'Operator qo‘shish', href: '/dashboard/oper-admin/operators/new' },
+          { label: 'Buyurtmalarni taqsimlash', href: '/dashboard/oper-admin/orders' },
+        );
+        break;
+      case 'TARGET_ADMIN':
+        activityWhere.user = {
+          role: {
+            slug: 'TARGETOLOG',
+          },
+        };
+        notificationWhere.OR = [
+          { type: NotificationType.LEAD },
+          { type: NotificationType.USER },
+        ];
+        quickActions.push(
+          { label: 'Targetolog qo‘shish', href: '/dashboard/target-admin/targetologs/new' },
+          { label: 'Reyting hisobotlari', href: '/dashboard/target-admin/reports' },
+        );
+        break;
+      case 'SELLER_ADMIN':
+        activityWhere.user = {
+          role: {
+            slug: 'SOTUVCHI',
+          },
+        };
+        notificationWhere.OR = [
+          { type: NotificationType.ORDER },
+          { type: NotificationType.PAYOUT },
+        ];
+        quickActions.push(
+          { label: 'Sotuvchi qo‘shish', href: '/dashboard/seller-admin/sellers/new' },
+          { label: 'Balans nazorati', href: '/dashboard/seller-admin/balances' },
+        );
+        break;
+      case 'SKLAD_ADMIN':
+        orderWhere.status = {
+          in: [
+            OrderStatus.ASSIGNED,
+            OrderStatus.IN_DELIVERY,
+            OrderStatus.DELIVERED,
+            OrderStatus.RETURNED,
+            OrderStatus.ARCHIVED,
+          ],
+        };
+        activityWhere.user = {
+          role: {
+            slug: {
+              in: ['SKLAD_ADMIN', 'OPERATOR'],
+            },
+          },
+        };
+        notificationWhere.OR = [
+          { type: NotificationType.ORDER },
+          { type: NotificationType.SYSTEM },
+        ];
+        quickActions.push(
+          { label: 'Yetkazib berish jadvali', href: '/dashboard/sklad-admin/deliveries' },
+          { label: 'Ombor inventari', href: '/dashboard/sklad-admin/warehouse' },
+        );
+        break;
       case 'TARGETOLOG':
         if (hasUser) {
           leadWhere.targetologId = userId;
           orderWhere.targetologId = userId;
           payoutWhere.userId = userId;
           activityWhere.userId = userId;
+          notificationWhere.OR = [
+            { toUserId: userId },
+            { type: NotificationType.LEAD },
+            { type: NotificationType.PAYOUT },
+          ];
         }
+        quickActions.push(
+          { label: 'Mahsulot katalogi', href: '/dashboard/targetolog/products' },
+          { label: 'Payout so‘rovi', href: '/dashboard/targetolog/payout' },
+        );
+        break;
+      case 'SOTUVCHI':
+        if (hasUser) {
+          orderWhere.product = {
+            is: {
+              sellerId: userId,
+            },
+          };
+          payoutWhere.userId = userId;
+          activityWhere.userId = userId;
+          notificationWhere.OR = [
+            { toUserId: userId },
+            { type: NotificationType.ORDER },
+            { type: NotificationType.PAYOUT },
+          ];
+        }
+        quickActions.push(
+          { label: 'Mahsulot qo‘shish', href: '/dashboard/sotuvchi/products/new' },
+          { label: 'Payout so‘rovi', href: '/dashboard/sotuvchi/payout' },
+        );
         break;
       case 'OPERATOR':
         if (hasUser) {
           orderWhere.operatorId = userId;
+          payoutWhere.userId = userId;
           activityWhere.userId = userId;
+          notificationWhere.OR = [
+            { toUserId: userId },
+            { type: NotificationType.ORDER },
+          ];
         }
-        break;
-      case 'SKLAD_ADMIN':
-        orderWhere.status = OrderStatus.IN_DELIVERY;
-        if (hasUser) {
-          activityWhere.userId = userId;
-        }
+        quickActions.push(
+          { label: 'Yangi buyurtmalar', href: '/dashboard/operator/orders?status=yangi' },
+          { label: 'Vazifalar jadvali', href: '/dashboard/operator/tasks' },
+        );
         break;
       default:
-        // Administrativ rollar umumiy ma’lumotlarni ko‘ra oladi.
+        notificationWhere.type = {
+          in: [NotificationType.SYSTEM, NotificationType.ORDER],
+        };
         break;
     }
 
@@ -278,24 +568,142 @@ export class StatsService {
       orderWhere,
       payoutWhere,
       activityWhere,
+      notificationWhere,
+      quickActions,
     };
   }
 
-  private buildMetrics(
-    role: string,
-    data: {
-      leadsToday: number;
-      ordersToday: number;
-      pendingPayouts: number;
-      deliveredOrders: number;
-      deliveredRevenue: number;
-      approvedPayouts: number;
-    },
-  ) {
+  private buildSummaryCards(role: string, data: SummaryInput) {
     const formatNumber = (value: number) =>
       value.toLocaleString('uz-UZ');
     const formatCurrency = (value: number) =>
       `${value.toLocaleString('uz-UZ')} so‘m`;
+
+    if (role === 'ADMIN') {
+      return [
+        {
+          label: 'Targetologlar',
+          value: formatNumber(data.roleCounts?.targetologs ?? 0),
+        },
+        {
+          label: 'Sotuvchilar',
+          value: formatNumber(data.roleCounts?.sellers ?? 0),
+        },
+        {
+          label: 'Operatorlar',
+          value: formatNumber(data.roleCounts?.operators ?? 0),
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+      ];
+    }
+
+    if (role === 'SUPER_ADMIN') {
+      return [
+        {
+          label: 'Faol foydalanuvchilar',
+          value: formatNumber(data.totalUsers),
+        },
+        {
+          label: 'Umumiy leadlar',
+          value: `${formatNumber(data.totalLeads)} ta`,
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Top targetologlar',
+          value: `${formatNumber(data.topTargetologCount ?? 0)} ta`,
+        },
+      ];
+    }
+
+    if (role === 'OPER_ADMIN') {
+      return [
+        {
+          label: 'Bugungi buyurtmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Qayta aloqa kerak',
+          value: `${formatNumber(data.leadRecontactCount)} ta`,
+        },
+        {
+          label: 'Top operatorlar',
+          value: `${formatNumber(data.topOperatorCount ?? 0)} ta`,
+        },
+      ];
+    }
+
+    if (role === 'TARGET_ADMIN') {
+      return [
+        {
+          label: 'Bugungi leadlar',
+          value: `${formatNumber(data.leadsToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan sotuvlar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Qayta aloqa leadlar',
+          value: `${formatNumber(data.leadRecontactCount)} ta`,
+        },
+        {
+          label: 'Top targetologlar',
+          value: `${formatNumber(data.topTargetologCount ?? 0)} ta`,
+        },
+      ];
+    }
+
+    if (role === 'SELLER_ADMIN') {
+      return [
+        {
+          label: 'Bugungi buyurtmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan buyurtmalar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Tasdiqlangan daromad',
+          value: formatCurrency(data.deliveredRevenue),
+        },
+        {
+          label: 'Top sotuvchilar',
+          value: `${formatNumber(data.topSellerCount ?? 0)} ta`,
+        },
+      ];
+    }
+
+    if (role === 'SKLAD_ADMIN') {
+      return [
+        {
+          label: 'Yetkazilishi kerak',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Bugungi jo‘natmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Qayta aloqa / muammolar',
+          value: `${formatNumber(data.leadRecontactCount)} ta`,
+        },
+        {
+          label: 'Yetkazib berilgan savdolar',
+          value: formatCurrency(data.deliveredRevenue),
+        },
+      ];
+    }
 
     if (role === 'TARGETOLOG') {
       return [
@@ -318,6 +726,27 @@ export class StatsService {
       ];
     }
 
+    if (role === 'SOTUVCHI') {
+      return [
+        {
+          label: 'Bugungi buyurtmalar',
+          value: `${formatNumber(data.ordersToday)} ta`,
+        },
+        {
+          label: 'Yakunlangan sotuvlar',
+          value: `${formatNumber(data.deliveredOrders)} ta`,
+        },
+        {
+          label: 'Balans',
+          value: formatCurrency(data.approvedPayouts),
+        },
+        {
+          label: 'Kutilayotgan to‘lovlar',
+          value: `${formatNumber(data.pendingPayouts)} ta`,
+        },
+      ];
+    }
+
     if (role === 'OPERATOR') {
       return [
         {
@@ -329,32 +758,11 @@ export class StatsService {
           value: `${formatNumber(data.deliveredOrders)} ta`,
         },
         {
-          label: 'Kutilayotgan qo‘ng‘iroqlar',
-          value: `${formatNumber(Math.max(data.pendingPayouts, 0))} ta`,
+          label: 'Rekontaktda',
+          value: `${formatNumber(data.leadRecontactCount)} ta`,
         },
         {
           label: 'Yakunlangan savdolar',
-          value: formatCurrency(data.deliveredRevenue),
-        },
-      ];
-    }
-
-    if (role === 'SKLAD_ADMIN') {
-      return [
-        {
-          label: 'Yetkazilishi kerak',
-          value: `${formatNumber(data.deliveredOrders)} ta`,
-        },
-        {
-          label: 'Bugungi jo‘natmalar',
-          value: `${formatNumber(data.ordersToday)} ta`,
-        },
-        {
-          label: 'Qabul qilish kutilmoqda',
-          value: `${formatNumber(data.pendingPayouts)} ta`,
-        },
-        {
-          label: 'Yetkazib berilgan savdolar',
           value: formatCurrency(data.deliveredRevenue),
         },
       ];
@@ -378,6 +786,284 @@ export class StatsService {
         value: formatCurrency(data.deliveredRevenue),
       },
     ];
+  }
+
+  private buildOrdersByStatus(
+    groups: { status: OrderStatus; _count: { _all: number } }[],
+    recontactCount: number,
+  ): OrdersByStatusItem[] {
+    const map = new Map<OrderStatus, number>();
+    for (const group of groups) {
+      map.set(group.status, Number(group._count?._all ?? 0));
+    }
+
+    const getCount = (status: OrderStatus) => map.get(status) ?? 0;
+
+    return [
+      {
+        key: 'new',
+        label: 'Yangi',
+        status: OrderStatus.NEW,
+        count: getCount(OrderStatus.NEW),
+        color: 'info',
+      },
+      {
+        key: 'assigned',
+        label: 'Operator belgilandi',
+        status: OrderStatus.ASSIGNED,
+        count: getCount(OrderStatus.ASSIGNED),
+        color: 'info',
+      },
+      {
+        key: 'in_delivery',
+        label: 'Yetkazilmoqda',
+        status: OrderStatus.IN_DELIVERY,
+        count: getCount(OrderStatus.IN_DELIVERY),
+        color: 'info',
+      },
+      {
+        key: 'delivered',
+        label: 'Yetkazilgan',
+        status: OrderStatus.DELIVERED,
+        count: getCount(OrderStatus.DELIVERED),
+        color: 'success',
+      },
+      {
+        key: 'returned',
+        label: 'Qaytarilgan',
+        status: OrderStatus.RETURNED,
+        count: getCount(OrderStatus.RETURNED),
+        color: 'danger',
+      },
+      {
+        key: 'recontact',
+        label: 'Qayta aloqa',
+        status: 'RECONTACT',
+        count: recontactCount,
+        color: 'warning',
+      },
+      {
+        key: 'archived',
+        label: 'Arxiv',
+        status: OrderStatus.ARCHIVED,
+        count: getCount(OrderStatus.ARCHIVED),
+        color: 'muted',
+      },
+    ];
+  }
+
+  private requiresRoleCounts(role: string) {
+    return role === 'ADMIN' || role === 'SUPER_ADMIN';
+  }
+
+  private requiresTopTargetologs(role: string) {
+    return ['ADMIN', 'SUPER_ADMIN', 'TARGET_ADMIN'].includes(role);
+  }
+
+  private requiresTopSellers(role: string) {
+    return ['ADMIN', 'SUPER_ADMIN', 'SELLER_ADMIN'].includes(role);
+  }
+
+  private requiresTopOperators(role: string) {
+    return ['ADMIN', 'SUPER_ADMIN', 'OPER_ADMIN', 'SKLAD_ADMIN'].includes(role);
+  }
+
+  private async getRoleCounts() {
+    const [targetologs, sellers, operators] = await Promise.all([
+      this.prisma.user.count({
+        where: { role: { slug: 'TARGETOLOG' }, status: UserStatus.ACTIVE },
+      }),
+      this.prisma.user.count({
+        where: { role: { slug: 'SOTUVCHI' }, status: UserStatus.ACTIVE },
+      }),
+      this.prisma.user.count({
+        where: { role: { slug: 'OPERATOR' }, status: UserStatus.ACTIVE },
+      }),
+    ]);
+
+    return { targetologs, sellers, operators };
+  }
+
+  private async fetchTopTargetologs(
+    orderWhere: Prisma.OrderWhereInput,
+  ): Promise<TopPerformer[]> {
+    const where: Prisma.OrderWhereInput = {
+      ...orderWhere,
+      targetologId: { not: null },
+      status: OrderStatus.DELIVERED,
+    };
+
+    const grouped = await this.prisma.order.groupBy({
+      by: ['targetologId'],
+      where,
+      _count: { _all: true },
+      _sum: { amount: true },
+      orderBy: {
+        _count: { _all: 'desc' },
+      },
+      take: 5,
+    });
+
+    const ids = grouped
+      .map((item) => item.targetologId)
+      .filter((value): value is string => Boolean(value));
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const [users, leadCounts] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, firstName: true, nickname: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['targetologId'],
+        where: { targetologId: { in: ids } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const userMap = new Map(
+      users.map((user) => [
+        user.id,
+        `${user.firstName} (${user.nickname})`,
+      ]),
+    );
+    const leadMap = new Map(
+      leadCounts.map((item) => [item.targetologId, Number(item._count?._all ?? 0)]),
+    );
+
+    return grouped.map((item) => ({
+      id: item.targetologId ?? '',
+      name: userMap.get(item.targetologId ?? '') ?? 'Noma’lum targetolog',
+      orders: Number(item._count?._all ?? 0),
+      revenue: Number(item._sum?.amount ?? 0),
+      leads: leadMap.get(item.targetologId ?? '') ?? 0,
+    }));
+  }
+
+  private async fetchTopSellers(
+    orderWhere: Prisma.OrderWhereInput,
+  ): Promise<TopPerformer[]> {
+    const where: Prisma.OrderWhereInput = {
+      ...orderWhere,
+      status: OrderStatus.DELIVERED,
+    };
+
+    const grouped = await this.prisma.order.groupBy({
+      by: ['productId'],
+      where,
+      _count: { _all: true },
+      _sum: { amount: true },
+    });
+
+    const productIds = grouped
+      .map((item) => item.productId)
+      .filter((value): value is string => Boolean(value));
+
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        sellerId: true,
+        seller: {
+          select: {
+            id: true,
+            firstName: true,
+            nickname: true,
+          },
+        },
+      },
+    });
+
+    const productMap = new Map(products.map((item) => [item.id, item]));
+    const sellerMap = new Map<
+      string,
+      { id: string; name: string; orders: number; revenue: number }
+    >();
+
+    for (const item of grouped) {
+      const product = item.productId
+        ? productMap.get(item.productId)
+        : undefined;
+      if (!product?.seller) {
+        continue;
+      }
+      const sellerId = product.seller.id;
+      const current = sellerMap.get(sellerId) ?? {
+        id: sellerId,
+        name: `${product.seller.firstName} (${product.seller.nickname})`,
+        orders: 0,
+        revenue: 0,
+      };
+
+      current.orders += Number(item._count?._all ?? 0);
+      current.revenue += Number(item._sum?.amount ?? 0);
+
+      sellerMap.set(sellerId, current);
+    }
+
+    return Array.from(sellerMap.values())
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 5);
+  }
+
+  private async fetchTopOperators(
+    orderWhere: Prisma.OrderWhereInput,
+  ): Promise<TopPerformer[]> {
+    const where: Prisma.OrderWhereInput = {
+      ...orderWhere,
+      operatorId: { not: null },
+      status: {
+        in: [
+          OrderStatus.ASSIGNED,
+          OrderStatus.IN_DELIVERY,
+          OrderStatus.DELIVERED,
+          OrderStatus.RETURNED,
+        ],
+      },
+    };
+
+    const grouped = await this.prisma.order.groupBy({
+      by: ['operatorId'],
+      where,
+      _count: { _all: true },
+      orderBy: {
+        _count: { _all: 'desc' },
+      },
+      take: 5,
+    });
+
+    const operatorIds = grouped
+      .map((item) => item.operatorId)
+      .filter((value): value is string => Boolean(value));
+
+    if (operatorIds.length === 0) {
+      return [];
+    }
+
+    const operators = await this.prisma.user.findMany({
+      where: { id: { in: operatorIds } },
+      select: { id: true, firstName: true, nickname: true },
+    });
+
+    const operatorMap = new Map(
+      operators.map((user) => [
+        user.id,
+        `${user.firstName} (${user.nickname})`,
+      ]),
+    );
+
+    return grouped.map((item) => ({
+      id: item.operatorId ?? '',
+      name: operatorMap.get(item.operatorId ?? '') ?? 'Noma’lum operator',
+      orders: Number(item._count?._all ?? 0),
+    }));
   }
 
   private buildMonthlyTrend(dates: Date[]): TrendPoint[] {
