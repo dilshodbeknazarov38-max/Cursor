@@ -51,12 +51,6 @@ export class AuthService {
       );
     }
 
-    if (!payload.termsAccepted) {
-      throw new BadRequestException(
-        'Davom etish uchun shartlar va maxfiylik siyosatini qabul qiling.',
-      );
-    }
-
     if (payload.password !== payload.passwordConfirm) {
       throw new BadRequestException('Parollar mos kelmadi.');
     }
@@ -64,15 +58,10 @@ export class AuthService {
     const safeUser = await this.usersService.createSelfRegisteredUser(
       {
         firstName: payload.firstName.trim(),
-        lastName: payload.lastName.trim(),
-        email: payload.email.trim().toLowerCase(),
         phone: payload.phone.trim(),
+        nickname: payload.nickname.trim(),
         password: payload.password,
-        roleSlug: payload.role,
         referralCode: payload.referralCode?.trim() || null,
-      },
-      {
-        nickname: this.composeNickname(payload.firstName, payload.lastName),
       },
     );
 
@@ -85,9 +74,8 @@ export class AuthService {
       device: context?.userAgent,
       meta: {
         phone: safeUser.phone,
-        email: safeUser.email ?? null,
-        role: safeUser.role?.slug ?? null,
-        referralCode: safeUser.referralCode ?? null,
+        nickname: safeUser.nickname,
+        role: safeUser.role?.slug ?? 'TARGETOLOG',
       },
     });
 
@@ -111,12 +99,24 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.BLOCKED) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: hisob bloklangan.',
+        ip: context?.ip,
+        device: context?.userAgent,
+      });
       throw new ForbiddenException(
         'Hisobingiz bloklangan. Administrator bilan bog‘laning.',
       );
     }
 
     if (user.status === UserStatus.INACTIVE) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: hisob faol emas.',
+        ip: context?.ip,
+        device: context?.userAgent,
+      });
       throw new ForbiddenException(
         'Hisobingiz faol emas. Administrator bilan bog‘laning.',
       );
@@ -127,6 +127,15 @@ export class AuthService {
       payload.parol,
     );
     if (!isPasswordValid) {
+      await this.activityService.log({
+        userId: user.id,
+        action: 'Muvaffaqiyatsiz kirish: noto‘g‘ri parol.',
+        ip: context?.ip,
+        device: context?.userAgent,
+        meta: {
+          rememberMe: payload.rememberMe ?? false,
+        },
+      });
       throw new UnauthorizedException('Login yoki parol noto‘g‘ri.');
     }
 
@@ -404,13 +413,5 @@ export class AuthService {
 
   private hashToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
-  }
-
-  private composeNickname(firstName: string, lastName?: string) {
-    const parts = [firstName, lastName ?? ''].map((part) =>
-      part?.trim().replace(/\s+/g, '-') ?? '',
-    );
-    const base = parts.filter(Boolean).join('.') || firstName;
-    return base.replace(/[^A-Za-z0-9._-]/g, '').toLowerCase();
   }
 }

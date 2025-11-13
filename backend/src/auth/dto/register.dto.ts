@@ -1,15 +1,10 @@
 import {
   IsBoolean,
-  IsEmail,
-  IsIn,
   IsOptional,
   IsString,
   Matches,
   MinLength,
 } from 'class-validator';
-
-const PASSWORD_REGEX =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]{8,}$/;
 
 export class RegisterDto {
   @IsString()
@@ -17,11 +12,8 @@ export class RegisterDto {
   firstName!: string;
 
   @IsString()
-  @MinLength(2, { message: 'Familiya kamida 2 ta belgi bo‘lishi kerak.' })
-  lastName!: string;
-
-  @IsEmail({}, { message: 'Yaroqli email manzilini kiriting.' })
-  email!: string;
+  @MinLength(3, { message: 'Nickname kamida 3 ta belgi bo‘lishi kerak.' })
+  nickname!: string;
 
   @IsString()
   @Matches(/^\+998\d{9}$/, {
@@ -30,26 +22,12 @@ export class RegisterDto {
   phone!: string;
 
   @IsString()
-  @Matches(PASSWORD_REGEX, {
-    message:
-      'Parol kamida 8 ta belgi, bitta katta harf, bitta kichik harf va raqamdan iborat bo‘lishi kerak.',
-  })
+  @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
   password!: string;
 
   @IsString()
-  @Matches(PASSWORD_REGEX, {
-    message:
-      'Parol kamida 8 ta belgi, bitta katta harf, bitta kichik harf va raqamdan iborat bo‘lishi kerak.',
-  })
+  @MinLength(8, { message: 'Parol kamida 8 ta belgi bo‘lishi kerak.' })
   passwordConfirm!: string;
-
-  @IsIn(['TARGETOLOG', 'SOTUVCHI'], {
-    message: 'Rol sifatida faqat Targetolog yoki Sotuvchi tanlanishi mumkin.',
-  })
-  role!: 'TARGETOLOG' | 'SOTUVCHI';
-
-  @IsBoolean()
-  termsAccepted!: boolean;
 
   @IsOptional()
   @IsString()

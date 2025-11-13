@@ -39,24 +39,22 @@ export class UsersService {
     });
   }
 
-  async createSelfRegisteredUser(
-    payload: {
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone: string;
-      password: string;
-      roleSlug: 'TARGETOLOG' | 'SOTUVCHI';
-      referralCode?: string | null;
-    },
-    options?: { nickname?: string },
-  ): Promise<SafeUser> {
+  async createSelfRegisteredUser(payload: {
+    firstName: string;
+    nickname: string;
+    phone: string;
+    password: string;
+    roleSlug?: 'TARGETOLOG' | 'SOTUVCHI';
+    email?: string | null;
+    lastName?: string | null;
+    referralCode?: string | null;
+  }): Promise<SafeUser> {
     const allowedRoles: Record<'TARGETOLOG' | 'SOTUVCHI', string> = {
       TARGETOLOG: 'Targetolog',
       SOTUVCHI: 'Sotuvchi',
     };
 
-    const normalizedRole = payload.roleSlug.toUpperCase() as
+    const normalizedRole = (payload.roleSlug ?? 'TARGETOLOG').toUpperCase() as
       | 'TARGETOLOG'
       | 'SOTUVCHI';
 
@@ -101,14 +99,15 @@ export class UsersService {
     });
 
     const nickname =
-      options?.nickname ??
-      this.generateNickname(payload.firstName, payload.lastName);
+      payload.nickname?.trim().length > 0
+        ? payload.nickname.trim()
+        : this.generateNickname(payload.firstName, payload.lastName ?? undefined);
 
     const user = await this.prisma.user.create({
       data: {
         firstName: payload.firstName,
-        lastName: payload.lastName,
-        email: payload.email,
+        lastName: payload.lastName ?? null,
+        email: payload.email ?? null,
         nickname,
         phone: payload.phone,
         passwordHash,

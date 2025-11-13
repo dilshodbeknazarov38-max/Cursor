@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Lock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -28,20 +27,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { API_BASE_URL } from "@/lib/api";
 
-const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]{8,}$/;
-
 const registerSchema = z
   .object({
     firstName: z
       .string()
       .min(2, "Ism kamida 2 ta belgi bo‘lishi kerak.")
       .max(60, "Ism 60 belgidan oshmasligi kerak."),
-    lastName: z
+    nickname: z
       .string()
-      .min(2, "Familiya kamida 2 ta belgi bo‘lishi kerak.")
-      .max(60, "Familiya 60 belgidan oshmasligi kerak."),
-    email: z.string().email("Yaroqli email manzilini kiriting."),
+      .min(3, "Nickname kamida 3 ta belgi bo‘lishi kerak.")
+      .max(40, "Nickname 40 belgidan oshmasligi kerak."),
     phone: z
       .string()
       .min(1, "Telefon raqamingizni kiriting.")
@@ -51,27 +46,8 @@ const registerSchema = z
       ),
     password: z
       .string()
-      .regex(
-        passwordRegex,
-        "Parol kamida 8 ta belgi, bitta katta harf, bitta kichik harf va raqamdan iborat bo‘lishi kerak."
-      ),
+      .min(8, "Parol kamida 8 ta belgi bo‘lishi kerak."),
     passwordConfirm: z.string(),
-    role: z.enum(["TARGETOLOG", "SOTUVCHI"], {
-      required_error: "Rolni tanlang.",
-    }),
-    referralCode: z
-      .string()
-      .max(64, "Referral kod 64 belgidan oshmasligi kerak.")
-      .optional()
-      .or(z.literal(""))
-      .transform((value) =>
-        value && value.trim().length > 0 ? value.trim() : undefined
-      ),
-    termsAccepted: z
-      .boolean()
-      .refine((value) => value === true, {
-        message: "Shartlar va maxfiylik siyosatini qabul qiling.",
-      }),
     captcha: z
       .boolean()
       .refine((value) => value === true, {
@@ -94,14 +70,10 @@ export function RegisterForm() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       firstName: "",
-      lastName: "",
-      email: "",
+      nickname: "",
       phone: "+998",
       password: "",
       passwordConfirm: "",
-      role: "TARGETOLOG",
-      referralCode: "",
-      termsAccepted: false,
       captcha: false,
     },
   });
@@ -118,14 +90,10 @@ export function RegisterForm() {
         },
         body: JSON.stringify({
           firstName: values.firstName,
-          lastName: values.lastName,
-          email: values.email,
+          nickname: values.nickname,
           phone: values.phone,
           password: values.password,
           passwordConfirm: values.passwordConfirm,
-          role: values.role,
-          referralCode: values.referralCode,
-          termsAccepted: values.termsAccepted,
           captcha: values.captcha,
         }),
       });
@@ -141,18 +109,14 @@ export function RegisterForm() {
       }
 
       setSuccessMessage(
-        "Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi. Tasdiqlash bo‘yicha ko‘rsatmalar email manzilingizga yuboriladi."
+        "Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi. Endi telefon raqamingiz orqali tizimga kiring."
       );
       form.reset({
         firstName: "",
-        lastName: "",
-        email: "",
+        nickname: "",
         phone: "+998",
         password: "",
         passwordConfirm: "",
-        role: "TARGETOLOG",
-        referralCode: "",
-        termsAccepted: false,
         captcha: false,
       });
 
@@ -167,15 +131,14 @@ export function RegisterForm() {
 
   return (
     <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-16">
-      <Card className="w-full max-w-2xl border-neutral-200 bg-white shadow-lg">
+      <Card className="w-full max-w-xl border-neutral-200 bg-white shadow-lg">
         <CardHeader className="space-y-3">
           <CardTitle className="text-2xl font-semibold text-neutral-900">
             Ro‘yxatdan o‘tish
           </CardTitle>
           <CardDescription className="text-base text-neutral-600">
-            Ma’lumotlaringizni to‘ldiring va CPAMaRKeT.Uz platformasidan
-            foydalanishni boshlang. Targetolog yoki Sotuvchi sifatida hisob
-            yarating.
+            Oddiy formani to‘ldiring va Targetolog sifatida hisob yarating.
+            Telefon raqamingiz login sifatida ishlatiladi.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -183,49 +146,33 @@ export function RegisterForm() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="space-y-6 px-6 pb-6"
           >
-            <div className="grid gap-6 sm:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="firstName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ism</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ismingiz" autoComplete="given-name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="lastName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Familiya</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Familiyangiz"
-                        autoComplete="family-name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
-              name="email"
+              name="firstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email manzil</FormLabel>
+                  <FormLabel>Ism</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="you@example.com"
-                      type="email"
-                      autoComplete="email"
+                      placeholder="Ismingiz"
+                      autoComplete="given-name"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="nickname"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nickname</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Sayt ichidagi ko‘rinadigan nom"
+                      autoComplete="nickname"
                       {...field}
                     />
                   </FormControl>
@@ -266,9 +213,6 @@ export function RegisterForm() {
                         {...field}
                       />
                     </FormControl>
-                    <p className="text-xs text-neutral-500">
-                      Katta-kichik harf va raqamdan iborat bo‘lishi shart.
-                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -292,114 +236,6 @@ export function RegisterForm() {
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rolni tanlang</FormLabel>
-                  <FormControl>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {[
-                        {
-                          value: "TARGETOLOG" as const,
-                          title: "Targetolog",
-                          description:
-                            "Leadlarni qabul qiling, kampaniyalarni boshqaring va statistika bilan ishlang.",
-                        },
-                        {
-                          value: "SOTUVCHI" as const,
-                          title: "Sotuvchi",
-                          description:
-                            "Mahsulotlaringizni joylashtiring, buyurtmalarni va balansni kuzating.",
-                        },
-                      ].map((roleOption) => {
-                        const isActive = field.value === roleOption.value;
-                        return (
-                          <button
-                            key={roleOption.value}
-                            type="button"
-                            onClick={() => field.onChange(roleOption.value)}
-                            aria-pressed={isActive}
-                            className={`rounded-xl border px-4 py-4 text-left transition ${
-                              isActive
-                                ? "border-emerald-500 bg-emerald-50"
-                                : "border-neutral-200 hover:border-emerald-200"
-                            }`}
-                          >
-                            <span className="text-sm font-semibold text-neutral-900">
-                              {roleOption.title}
-                            </span>
-                            <p className="mt-2 text-sm text-neutral-600">
-                              {roleOption.description}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="referralCode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Referral / Invite kod (ixtiyoriy)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Agar mavjud bo‘lsa kiriting"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="termsAccepted"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-neutral-50/80 px-4 py-3">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) =>
-                          field.onChange(checked === true)
-                        }
-                      />
-                    </FormControl>
-                    <div className="space-y-1 text-sm text-neutral-600">
-                      <FormLabel className="text-sm font-medium text-neutral-900">
-                        Shartlar bilan tanishdim
-                      </FormLabel>
-                      <p>
-                        Men{" "}
-                        <Link
-                          href="/foydalanish-shartlari"
-                          className="font-medium text-emerald-600 underline-offset-4 hover:underline"
-                        >
-                          Foydalanish shartlari
-                        </Link>{" "}
-                        va{" "}
-                        <Link
-                          href="/maxfiylik"
-                          className="font-medium text-emerald-600 underline-offset-4 hover:underline"
-                        >
-                          Maxfiylik siyosati
-                        </Link>
-                        ga rozilik bildiraman.
-                      </p>
-                    </div>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="captcha"
@@ -446,8 +282,8 @@ export function RegisterForm() {
             </Button>
           </form>
         </Form>
-        <CardFooter className="flex flex-col items-center gap-4 border-t border-neutral-200/80 px-6 pb-6 pt-6">
-          <div className="text-center text-sm text-neutral-600">
+        <CardFooter className="flex items-center justify-center border-t border-neutral-200/80 px-6 py-4">
+          <p className="text-sm text-neutral-600">
             Allaqachon hisobingiz bormi?{" "}
             <Link
               href="/kirish"
@@ -455,30 +291,7 @@ export function RegisterForm() {
             >
               Kirish
             </Link>
-          </div>
-          <div className="flex w-full flex-col items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-              Yoki ijtimoiy tarmoqlar orqali
-            </span>
-            <div className="flex flex-wrap justify-center gap-3">
-              {["Google", "Facebook", "Telegram"].map((provider) => (
-                <Button
-                  key={provider}
-                  variant="outline"
-                  type="button"
-                  disabled
-                  className="gap-2"
-                  title="Tez orada qo‘shiladi"
-                >
-                  <Lock className="h-4 w-4" aria-hidden="true" />
-                  {provider}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-neutral-400">
-              Tez orada integratsiya qo‘shiladi.
-            </p>
-          </div>
+          </p>
         </CardFooter>
       </Card>
     </div>

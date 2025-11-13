@@ -6,10 +6,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { label: "Home", href: "#hero" },
-  { label: "Mahsulotlar", href: "#products" },
-  { label: "Targetologlar", href: "#targetologists" },
-  { label: "To‘lovlar", href: "#stats" },
+  { label: "Bosh sahifa", href: "#hero" },
+  { label: "Xizmatlar", href: "#features" },
+  { label: "Qanday ishlaydi", href: "#how-it-works" },
+  { label: "Statistika", href: "#stats" },
   { label: "Kontakt", href: "#contact" },
 ];
 
