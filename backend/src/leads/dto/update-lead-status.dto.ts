@@ -1,10 +1,8 @@
-import { IsEnum } from 'class-validator';
-import { LeadStatus } from '@prisma/client';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class UpdateLeadStatusDto {
-  @IsEnum(LeadStatus, {
-    message:
-      'Yaroqsiz lead statusi. YANGI | TASDIQLANGAN | RAD_ETILGAN | QAYTA_ALOQA dan birini tanlang.',
-  })
-  status!: LeadStatus;
+export class LeadNoteDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(500, { message: 'Izoh 500 belgidan oshmasligi kerak.' })
+  note?: string;
 }

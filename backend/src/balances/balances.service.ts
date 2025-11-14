@@ -268,7 +268,7 @@ export class BalancesService {
         product: {
           select: {
             id: true,
-            name: true,
+              title: true,
             cpaTargetolog: true,
             cpaOperator: true,
           },
@@ -307,7 +307,7 @@ export class BalancesService {
           amount: productAmount,
           transactionType: BalanceTransactionType.LEAD_ACCEPTED,
           isCredit: true,
-          note: `Lead tasdiqlandi: ${lead.product.name}`,
+          note: `Lead tasdiqlandi: ${lead.product.title}`,
           metadata: {
             productId: lead.product.id,
             leadId,
@@ -319,10 +319,10 @@ export class BalancesService {
     }
 
     const orderWithOperator = await this.prisma.order.findFirst({
-      where: {
-        leadId,
-        operatorId: { not: null },
-      },
+        where: {
+          leadId,
+          operatorId: { not: undefined },
+        },
       include: {
         operator: {
           select: {
@@ -403,22 +403,28 @@ export class BalancesService {
       take: 5,
     });
 
-    if (duplicates.length === 0) {
-      return;
-    }
+      if (duplicates.length === 0) {
+        return;
+      }
 
-    const score = FRAUD_CARD_SCORE + duplicates.length * 5;
+      const score = FRAUD_CARD_SCORE + duplicates.length * 5;
+      const duplicatesPayload = duplicates.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        status: item.status,
+        amount: Number(item.amount),
+      }));
 
-    await this.openFraudCheck({
-      userId: payload.userId,
-      transactionId: payload.transactionId,
-      reason: 'Bir karta raqami bir nechta foydalanuvchida ishlatilmoqda.',
-      metadata: {
-        cardNumber: this.maskCardNumber(payload.cardNumber),
-        duplicates,
-        score,
-      },
-    });
+      await this.openFraudCheck({
+        userId: payload.userId,
+        transactionId: payload.transactionId,
+        reason: 'Bir karta raqami bir nechta foydalanuvchida ishlatilmoqda.',
+        metadata: {
+          cardNumber: this.maskCardNumber(payload.cardNumber),
+          duplicates: duplicatesPayload,
+          score,
+        },
+      });
   }
 
   async evaluateLeadIpAbuse(userId: string, ip?: string | null) {
@@ -459,7 +465,7 @@ export class BalancesService {
         product: {
           select: {
             id: true,
-            name: true,
+              title: true,
             cpaTargetolog: true,
             cpaOperator: true,
           },
@@ -496,7 +502,7 @@ export class BalancesService {
           amount: holdAmount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Lead bekor qilindi: ${lead.product.name}`,
+          note: `Lead bekor qilindi: ${lead.product.title}`,
           metadata: {
             leadId,
             productId: lead.product.id,
@@ -532,7 +538,7 @@ export class BalancesService {
     const orderWithOperator = await this.prisma.order.findFirst({
       where: {
         leadId,
-        operatorId: { not: null },
+          operatorId: { not: undefined },
       },
       include: {
         operator: {
@@ -593,24 +599,24 @@ export class BalancesService {
   async handleOrderDelivered(orderId: string, actorId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        lead: true,
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sellerId: true,
-            cpaTargetolog: true,
-            cpaOperator: true,
-            seller: {
-              select: {
-                id: true,
-                salesSharePercent: true,
-                role: { select: { slug: true } },
+        include: {
+          lead: true,
+          product: {
+            select: {
+              id: true,
+              title: true,
+              ownerId: true,
+              cpaTargetolog: true,
+              cpaOperator: true,
+              owner: {
+                select: {
+                  id: true,
+                  salesSharePercent: true,
+                  role: { select: { slug: true } },
+                },
               },
             },
           },
-        },
         targetolog: {
           select: {
             id: true,
@@ -636,7 +642,7 @@ export class BalancesService {
       await this.handleLeadApproved(order.leadId, actorId);
     }
 
-    const productName = order.product.name;
+    const productName = order.product.title;
 
     if (
       order.product.cpaTargetolog &&
@@ -682,35 +688,35 @@ export class BalancesService {
       });
     }
 
-    if (order.product.seller?.id) {
-      const sharePercent = order.product.seller.salesSharePercent ?? new Prisma.Decimal(
-        100,
-      );
-      const shareAmount = new Prisma.Decimal(order.amount).mul(
-        new Prisma.Decimal(sharePercent).dividedBy(100),
-      );
+      if (order.product.owner?.id) {
+        const sharePercent = new Prisma.Decimal(
+          order.product.owner.salesSharePercent ?? 100,
+        );
+        const shareAmount = new Prisma.Decimal(order.amount).mul(
+          sharePercent.dividedBy(100),
+        );
 
-      if (shareAmount.gt(0)) {
-        await this.applyTransaction({
-          userId: order.product.seller.id,
-          accountType: this.resolveMainAccountType(
-            order.product.seller.role?.slug ?? '',
-          ),
-          amount: shareAmount,
-          transactionType: BalanceTransactionType.LEAD_SOLD,
-          isCredit: true,
-          note: `Sotuv tasdiqlandi: ${productName}`,
-          metadata: {
-            orderId,
-            productId: order.product.id,
-            leadId: order.leadId,
-            salesSharePercent: sharePercent,
-          },
-          leadId: order.leadId ?? undefined,
-          actorId,
-        });
+        if (shareAmount.gt(0)) {
+          await this.applyTransaction({
+            userId: order.product.owner.id,
+            accountType: this.resolveMainAccountType(
+              order.product.owner.role?.slug ?? '',
+            ),
+            amount: shareAmount,
+            transactionType: BalanceTransactionType.LEAD_SOLD,
+            isCredit: true,
+            note: `Sotuv tasdiqlandi: ${productName}`,
+            metadata: {
+              orderId,
+              productId: order.product.id,
+              leadId: order.leadId,
+              salesSharePercent: sharePercent.toNumber(),
+            },
+            leadId: order.leadId ?? undefined,
+            actorId,
+          });
+        }
       }
-    }
   }
 
   async handleOrderReturned(orderId: string, actorId?: string) {
@@ -719,17 +725,17 @@ export class BalancesService {
       include: {
         lead: true,
         product: {
-          select: {
-            id: true,
-            name: true,
-            sellerId: true,
-            seller: {
-              select: {
-                id: true,
-                role: { select: { slug: true } },
+            select: {
+              id: true,
+              title: true,
+              ownerId: true,
+              owner: {
+                select: {
+                  id: true,
+                  role: { select: { slug: true } },
+                },
               },
             },
-          },
         },
         targetolog: {
           select: {
@@ -767,7 +773,7 @@ export class BalancesService {
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,
@@ -795,7 +801,7 @@ export class BalancesService {
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,
@@ -806,15 +812,15 @@ export class BalancesService {
       }
     }
 
-    if (order.product.seller?.id && order.leadId) {
+    if (order.product.owner?.id && order.leadId) {
       const saleTx = await this.prisma.balanceTransaction.findFirst({
         where: {
-          userId: order.product.seller.id,
+          userId: order.product.owner.id,
           leadId: order.leadId,
           type: BalanceTransactionType.LEAD_SOLD,
           account: {
             type: this.resolveMainAccountType(
-              order.product.seller.role?.slug ?? '',
+              order.product.owner.role?.slug ?? '',
             ),
           },
         },
@@ -822,14 +828,14 @@ export class BalancesService {
 
       if (saleTx) {
         await this.applyTransaction({
-          userId: order.product.seller.id,
+          userId: order.product.owner.id,
           accountType: this.resolveMainAccountType(
-            order.product.seller.role?.slug ?? '',
+            order.product.owner.role?.slug ?? '',
           ),
           amount: saleTx.amount,
           transactionType: BalanceTransactionType.LEAD_CANCELLED,
           isCredit: false,
-          note: `Buyurtma qaytarildi: ${order.product.name}`,
+          note: `Buyurtma qaytarildi: ${order.product.title}`,
           metadata: {
             orderId,
             leadId: order.leadId,
@@ -1339,7 +1345,7 @@ export class BalancesService {
         },
         _sum: { amount: true },
       });
-      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+      const projected = new Prisma.Decimal(aggregate._sum?.amount ?? 0).plus(
         amount,
       );
       if (projected.gt(limits.dailyAmountLimit)) {
@@ -1361,7 +1367,7 @@ export class BalancesService {
         },
         _sum: { amount: true },
       });
-      const projected = new Prisma.Decimal(aggregate._sum.amount ?? 0).plus(
+      const projected = new Prisma.Decimal(aggregate._sum?.amount ?? 0).plus(
         amount,
       );
       if (projected.gt(limits.monthlyAmountLimit)) {

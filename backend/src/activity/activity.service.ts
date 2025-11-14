@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -27,7 +28,7 @@ export class ActivityService {
         },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error instanceof PrismaClientKnownRequestError) {
         // Faollik jurnali yozib olinmasa ham, asosiy jarayon to‘xtamasligi kerak.
         return null;
       }

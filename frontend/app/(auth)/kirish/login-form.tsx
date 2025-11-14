@@ -25,8 +25,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { invalidateAuthCache } from "@/hooks/use-auth";
 import { API_BASE_URL } from "@/lib/api";
 import { setSession } from "@/lib/session";
+import { getDashboardPathFromRole, normalizeRoleSlug } from "@/lib/roles";
 
 const loginSchema = z.object({
   telefon: z
@@ -80,8 +82,8 @@ export function LoginForm() {
         credentials: "include",
       });
 
-        if (!response.ok) {
-          const errorBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
         const message =
           typeof errorBody?.message === "string"
             ? errorBody.message
@@ -90,19 +92,25 @@ export function LoginForm() {
         return;
       }
 
-        const data = await response.json();
+      const data = await response.json();
 
-        const roleSlug = (data.user?.role?.slug ?? "TARGETOLOG").toLowerCase();
+      const roleSlug = normalizeRoleSlug(data.user?.role);
+      const redirectRoute =
+        typeof data.user?.roleRoute === "string"
+          ? data.user.roleRoute
+          : getDashboardPathFromRole(roleSlug);
 
-        setSession({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          role: roleSlug.toUpperCase(),
-          userId: data.user?.id ?? "",
-          rememberMe: values.rememberMe,
-        });
+      setSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        role: roleSlug,
+        userId: data.user?.id ?? "",
+        rememberMe: values.rememberMe,
+      });
 
-        router.push(`/dashboard/${roleSlug}`);
+      invalidateAuthCache();
+
+      router.replace(`/dashboard/${redirectRoute}`);
     } catch (error) {
       console.error("Login error", error);
       setServerError("Serverga ulanib bo‘lmadi. Keyinroq urinib ko‘ring.");

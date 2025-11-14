@@ -306,47 +306,65 @@ export class AppService implements OnModuleInit {
       },
     });
 
-    const productSlug = `demo-product-${supplierUser.id.slice(0, 8)}`;
-    const product = await this.prisma.product.upsert({
-      where: { slug: productSlug },
-      update: {},
-      create: {
-        name: 'Demo mahsulot',
-        slug: productSlug,
-        category: 'Demo',
-        shortDescription: 'Demo mahsulot uchun qisqa tavsif.',
-        fullDescription: 'Demo mahsulotning to‘liq tavsifi.',
-        price: new Prisma.Decimal('350000'),
-        cpaTargetolog: new Prisma.Decimal('150000'),
-        cpaOperator: new Prisma.Decimal('80000'),
-        mainImageUrl: '/static/placeholders/product.png',
-        smartLinkUrl: 'https://example.com/demo-product',
-        status: ProductStatus.ACTIVE,
-        sellerId: supplierUser.id,
-        tags: ['demo', 'mahsulot'],
-        trafficSources: ['facebook', 'instagram'],
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        ownerId: supplierUser.id,
+        title: 'Demo mahsulot',
+      },
+    });
+
+    const product =
+      existingProduct ??
+      (await this.prisma.product.create({
+        data: {
+          title: 'Demo mahsulot',
+          description: 'Demo mahsulotning to‘liq tavsifi.',
+          price: new Prisma.Decimal('350000'),
+          cpaTargetolog: new Prisma.Decimal('150000'),
+          cpaOperator: new Prisma.Decimal('80000'),
+          images: ['/static/placeholders/product.png'],
+          stock: 100,
+          status: ProductStatus.APPROVED,
+          ownerId: supplierUser.id,
+        },
+      }));
+
+    const flow = await this.prisma.flow.create({
+      data: {
+        title: 'Demo oqim',
+        slug: `demo-${product.id.slice(0, 6)}`,
+        url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/products/${product.id}`,
+        productId: product.id,
+        ownerId: targetUser.id,
       },
     });
 
     const lead = await this.prisma.lead.create({
       data: {
+        flowId: flow.id,
         productId: product.id,
         targetologId: targetUser.id,
-        status: LeadStatus.TASDIQLANGAN,
+        operatorId: operatorUser.id,
+        phone: '+998901112233',
+        name: 'Demo lead',
+        status: LeadStatus.CONFIRMED,
         notes: 'Demo lid avtomatik yaratilgan.',
       },
     });
 
-    await this.prisma.order.create({
-      data: {
-        productId: product.id,
-        targetologId: targetUser.id,
-        operatorId: operatorUser.id,
-        leadId: lead.id,
-        status: OrderStatus.DELIVERED,
-        amount: new Prisma.Decimal('350000'),
-      },
-    });
+      await this.prisma.order.create({
+        data: {
+          productId: product.id,
+          targetologId: targetUser.id,
+          operatorId: operatorUser.id,
+          leadId: lead.id,
+          status: OrderStatus.DELIVERED,
+          amount: new Prisma.Decimal('350000'),
+          packedAt: new Date(),
+          shippedAt: new Date(),
+          deliveredAt: new Date(),
+        },
+      });
 
     const targetMainAccount = await this.prisma.balanceAccount.upsert({
       where: {
@@ -474,7 +492,7 @@ export class AppService implements OnModuleInit {
     });
   }
 
-  private async ensureDefaultAdmin(tx: PrismaService) {
+  private async ensureDefaultAdmin(tx: Prisma.TransactionClient) {
     const adminPhone = this.configService.get<string>('ADMIN_PHONE');
     const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
 

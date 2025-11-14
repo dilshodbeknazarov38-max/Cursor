@@ -31,6 +31,14 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  APP_PUBLIC_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  API_PUBLIC_URL?: string;
+
+  @IsOptional()
+  @IsString()
   CORS_ORIGINS?: string;
 
   @IsOptional()

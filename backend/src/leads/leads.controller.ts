@@ -1,23 +1,12 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { LeadStatus } from '@prisma/client';
-import { Request } from 'express';
+import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 
 import { Roles } from '@/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { RolesGuard } from '@/common/guards/roles.guard';
 
 import { CreateLeadDto } from './dto/create-lead.dto';
-import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
+import { LeadNoteDto } from './dto/update-lead-status.dto';
 import { LeadsService } from './leads.service';
 
 type AuthenticatedRequest = Request & {
@@ -28,59 +17,74 @@ type AuthenticatedRequest = Request & {
 };
 
 @Controller('leads')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
   @Post()
-  @Roles('TARGETOLOG', 'TARGET_ADMIN', 'ADMIN')
-  create(
-    @Body() dto: CreateLeadDto,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    return this.leadsService.create(dto, {
-      userId: req.user?.sub ?? '',
-      role: req.user?.role ?? '',
-      ip: req.ip ?? undefined,
-      device: req.headers['user-agent'] ?? undefined,
+  create(@Body() dto: CreateLeadDto, @Req() req: Request) {
+    return this.leadsService.createPublicLead(dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] ?? null,
     });
   }
 
-  @Get()
-  @Roles(
-    'TARGETOLOG',
-    'TARGET_ADMIN',
-    'ADMIN',
-    'OPER_ADMIN',
-    'SUPER_ADMIN',
-  )
-  findAll(
-    @Req() req: AuthenticatedRequest,
-    @Query('status') status?: LeadStatus,
-    @Query('productId') productId?: string,
-  ) {
-    const uppercased = status ? String(status).toUpperCase() : undefined;
-    const normalizedStatus =
-      uppercased && (Object.values(LeadStatus) as string[]).includes(uppercased)
-        ? (uppercased as LeadStatus)
-        : undefined;
-    return this.leadsService.findAll(
-      {
-        userId: req.user?.sub ?? '',
-        role: req.user?.role ?? '',
-      },
-      { status: normalizedStatus, productId },
-    );
+  @Get('new')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OPERATOR', 'OPER_ADMIN')
+  getNew(@Req() req: AuthenticatedRequest) {
+    return this.leadsService.getOperatorQueue({
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
   }
 
-  @Patch(':id/status')
-  @Roles('TARGETOLOG', 'TARGET_ADMIN', 'ADMIN', 'OPER_ADMIN')
-  updateStatus(
+  @Put(':id/assign')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OPERATOR', 'OPER_ADMIN')
+  assign(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.leadsService.assignLead(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/callback')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OPERATOR', 'OPER_ADMIN')
+  markCallback(
     @Param('id') id: string,
-    @Body() dto: UpdateLeadStatusDto,
+    @Body() dto: LeadNoteDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.leadsService.updateStatus(id, dto, {
+    return this.leadsService.markCallback(id, dto, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OPERATOR', 'OPER_ADMIN')
+  cancel(
+    @Param('id') id: string,
+    @Body() dto: LeadNoteDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.leadsService.cancelLead(id, dto, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/confirm')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OPERATOR', 'OPER_ADMIN')
+  confirm(
+    @Param('id') id: string,
+    @Body() dto: LeadNoteDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.leadsService.confirmLead(id, dto, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
     });

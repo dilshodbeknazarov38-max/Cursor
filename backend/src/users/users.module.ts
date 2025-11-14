@@ -4,13 +4,14 @@ import { ActivityModule } from '@/activity/activity.module';
 import { NotificationsModule } from '@/notifications/notifications.module';
 import { PrismaModule } from '@/prisma/prisma.module';
 
+import { AdminUsersController } from './admin-users.controller';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
-@Module({
-  imports: [PrismaModule, ActivityModule, NotificationsModule],
-  controllers: [UsersController],
-  providers: [UsersService],
-  exports: [UsersService],
-})
+  @Module({
+    imports: [PrismaModule, ActivityModule, NotificationsModule],
+    controllers: [UsersController, AdminUsersController],
+    providers: [UsersService],
+    exports: [UsersService],
+  })
 export class UsersModule {}

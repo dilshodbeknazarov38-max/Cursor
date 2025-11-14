@@ -1,20 +1,6 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UploadedFiles,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Put, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
-import { Request } from 'express';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import type { Request } from 'express';
 
 import { Roles } from '@/common/decorators/roles.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -36,127 +22,83 @@ type AuthenticatedRequest = Request & {
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  @Get()
-  @Roles(
-    'ADMIN',
-    'SUPER_ADMIN',
-    'TARGET_ADMIN',
-    'OPER_ADMIN',
-    'SKLAD_ADMIN',
-    'TARGETOLOG',
-    'OPERATOR',
-    'TAMINOTCHI',
-  )
-  findAll(
-    @Req() req: AuthenticatedRequest,
-    @Query('status') status?: ProductStatus,
-  ) {
-    const uppercased = status ? String(status).toUpperCase() : undefined;
-    const normalizedStatus =
-      uppercased &&
-      (Object.values(ProductStatus) as string[]).includes(uppercased)
-        ? (uppercased as ProductStatus)
-        : undefined;
-    return this.productsService.findAll(
-      {
-        role: req.user?.role ?? '',
-        userId: req.user?.sub ?? '',
-      },
-      {
-      status: normalizedStatus,
-      },
-    );
-  }
-
-  @Get(':id')
-  @Roles(
-    'ADMIN',
-    'SUPER_ADMIN',
-    'TARGET_ADMIN',
-    'OPER_ADMIN',
-    'TARGETOLOG',
-    'OPERATOR',
-    'SKLAD_ADMIN',
-    'TAMINOTCHI',
-  )
-  findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.productsService.findOne(id, {
-      role: req.user?.role ?? '',
+  @Post()
+  @Roles('TAMINOTCHI')
+  create(@Body() dto: CreateProductDto, @Req() req: AuthenticatedRequest) {
+    return this.productsService.create(dto, {
       userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
     });
   }
 
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'mainImage', maxCount: 1 },
-      { name: 'creative', maxCount: 1 },
-    ]),
-  )
-  @Post()
-  @Roles('ADMIN', 'SUPER_ADMIN', 'TAMINOTCHI')
-  create(
-    @Body() dto: CreateProductDto,
-    @UploadedFiles()
-    files: {
-      mainImage?: Express.Multer.File[];
-      creative?: Express.Multer.File[];
-    },
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const mainImage = files?.mainImage?.[0];
-    if (!mainImage) {
-      throw new BadRequestException('Asosiy rasm yuklash majburiy.');
-    }
-
-    return this.productsService.create(
-      dto,
+  @Get('me')
+  @Roles('TAMINOTCHI')
+  findMine(@Req() req: AuthenticatedRequest, @Query('status') status?: ProductStatus) {
+    return this.productsService.findMine(
       {
         userId: req.user?.sub ?? '',
         role: req.user?.role ?? '',
       },
-      {
-        mainImage,
-        creative: files?.creative?.[0],
-      },
+      status,
     );
   }
 
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'mainImage', maxCount: 1 },
-      { name: 'creative', maxCount: 1 },
-    ]),
-  )
-  @Patch(':id')
-  @Roles('ADMIN', 'SUPER_ADMIN', 'TAMINOTCHI')
+  @Get()
+  @Roles('ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN')
+  findAll(@Query('status') status?: ProductStatus) {
+    return this.productsService.findAll(status);
+  }
+
+  @Get('approved')
+  @Roles('TARGETOLOG')
+  findApproved() {
+    return this.productsService.findApproved();
+  }
+
+  @Get(':id')
+  @Roles('ADMIN', 'SUPER_ADMIN', 'SKLAD_ADMIN', 'TAMINOTCHI', 'TARGETOLOG')
+  findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.productsService.findOne(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id')
+  @Roles('TAMINOTCHI')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
-    @UploadedFiles()
-    files: {
-      mainImage?: Express.Multer.File[];
-      creative?: Express.Multer.File[];
-    },
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.productsService.update(
-      id,
-      dto,
-      {
-        userId: req.user?.sub ?? '',
-        role: req.user?.role ?? '',
-      },
-      {
-        mainImage: files?.mainImage?.[0],
-        creative: files?.creative?.[0],
-      },
-    );
+    return this.productsService.update(id, dto, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
   }
 
-  @Patch(':id/archive')
-  @Roles('ADMIN', 'SUPER_ADMIN')
-  archive(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.productsService.archive(id, {
+  @Delete(':id')
+  @Roles('TAMINOTCHI')
+  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.productsService.remove(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/approve')
+  @Roles('SKLAD_ADMIN')
+  approve(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.productsService.approve(id, {
+      userId: req.user?.sub ?? '',
+      role: req.user?.role ?? '',
+    });
+  }
+
+  @Put(':id/reject')
+  @Roles('SKLAD_ADMIN')
+  reject(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.productsService.reject(id, {
       userId: req.user?.sub ?? '',
       role: req.user?.role ?? '',
     });
