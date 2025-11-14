@@ -268,7 +268,7 @@ export class BalancesService {
         product: {
           select: {
             id: true,
-            name: true,
+              title: true,
             cpaTargetolog: true,
             cpaOperator: true,
           },
@@ -403,22 +403,28 @@ export class BalancesService {
       take: 5,
     });
 
-    if (duplicates.length === 0) {
-      return;
-    }
+      if (duplicates.length === 0) {
+        return;
+      }
 
-    const score = FRAUD_CARD_SCORE + duplicates.length * 5;
+      const score = FRAUD_CARD_SCORE + duplicates.length * 5;
+      const duplicatesPayload = duplicates.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        status: item.status,
+        amount: Number(item.amount),
+      }));
 
-    await this.openFraudCheck({
-      userId: payload.userId,
-      transactionId: payload.transactionId,
-      reason: 'Bir karta raqami bir nechta foydalanuvchida ishlatilmoqda.',
-      metadata: {
-        cardNumber: this.maskCardNumber(payload.cardNumber),
-        duplicates,
-        score,
-      },
-    });
+      await this.openFraudCheck({
+        userId: payload.userId,
+        transactionId: payload.transactionId,
+        reason: 'Bir karta raqami bir nechta foydalanuvchida ishlatilmoqda.',
+        metadata: {
+          cardNumber: this.maskCardNumber(payload.cardNumber),
+          duplicates: duplicatesPayload,
+          score,
+        },
+      });
   }
 
   async evaluateLeadIpAbuse(userId: string, ip?: string | null) {
@@ -459,7 +465,7 @@ export class BalancesService {
         product: {
           select: {
             id: true,
-            name: true,
+              title: true,
             cpaTargetolog: true,
             cpaOperator: true,
           },
@@ -682,35 +688,35 @@ export class BalancesService {
       });
     }
 
-    if (order.product.owner?.id) {
-      const sharePercent = order.product.owner.salesSharePercent ?? new Prisma.Decimal(
-        100,
-      );
-      const shareAmount = new Prisma.Decimal(order.amount).mul(
-        new Prisma.Decimal(sharePercent).dividedBy(100),
-      );
+      if (order.product.owner?.id) {
+        const sharePercent = new Prisma.Decimal(
+          order.product.owner.salesSharePercent ?? 100,
+        );
+        const shareAmount = new Prisma.Decimal(order.amount).mul(
+          sharePercent.dividedBy(100),
+        );
 
-      if (shareAmount.gt(0)) {
-        await this.applyTransaction({
-          userId: order.product.owner.id,
-          accountType: this.resolveMainAccountType(
-            order.product.owner.role?.slug ?? '',
-          ),
-          amount: shareAmount,
-          transactionType: BalanceTransactionType.LEAD_SOLD,
-          isCredit: true,
-          note: `Sotuv tasdiqlandi: ${productName}`,
-          metadata: {
-            orderId,
-            productId: order.product.id,
-            leadId: order.leadId,
-            salesSharePercent: sharePercent,
-          },
-          leadId: order.leadId ?? undefined,
-          actorId,
-        });
+        if (shareAmount.gt(0)) {
+          await this.applyTransaction({
+            userId: order.product.owner.id,
+            accountType: this.resolveMainAccountType(
+              order.product.owner.role?.slug ?? '',
+            ),
+            amount: shareAmount,
+            transactionType: BalanceTransactionType.LEAD_SOLD,
+            isCredit: true,
+            note: `Sotuv tasdiqlandi: ${productName}`,
+            metadata: {
+              orderId,
+              productId: order.product.id,
+              leadId: order.leadId,
+              salesSharePercent: sharePercent.toNumber(),
+            },
+            leadId: order.leadId ?? undefined,
+            actorId,
+          });
+        }
       }
-    }
   }
 
   async handleOrderReturned(orderId: string, actorId?: string) {

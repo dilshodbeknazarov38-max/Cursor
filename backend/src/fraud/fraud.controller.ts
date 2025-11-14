@@ -13,7 +13,7 @@ export class FraudController {
   constructor(private readonly fraudService: FraudService) {}
 
   @Get('overview')
-  getOverview() {
+  async getOverview(): Promise<Awaited<ReturnType<FraudService['getOverview']>>> {
     return this.fraudService.getOverview();
   }
 }

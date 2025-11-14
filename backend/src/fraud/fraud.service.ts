@@ -3,7 +3,7 @@ import { LeadStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
-interface FraudSummary {
+export interface FraudSummary {
   duplicatePhones: number;
   suspiciousIps: number;
   sharedCards: number;
@@ -25,14 +25,14 @@ export class FraudService {
   async getOverview() {
     const lookbackDate = this.subtractDays(new Date(), this.lookbackDays);
 
-      const [
-        duplicatePhoneGroupsRaw,
-        ipGroupsRaw,
-        cardGroupsRaw,
-        highValueTransactions,
-        cancelledLeads,
-        openFraudChecks,
-      ] = await this.prisma.$transaction([
+    const [
+      duplicatePhoneGroupsRaw,
+      ipGroupsRaw,
+      cardGroupsRaw,
+      highValueTransactions,
+      cancelledLeads,
+      openFraudChecks,
+    ] = await this.prisma.$transaction([
         this.prisma.lead.groupBy({
           by: ['phone'],
           where: {
@@ -121,22 +121,40 @@ export class FraudService {
       }),
     ]);
 
-      const duplicatePhoneGroups = duplicatePhoneGroupsRaw.filter(
-        (group) => (group._count ?? 0) > this.duplicatePhoneThreshold - 1,
+    const duplicatePhoneGroups = duplicatePhoneGroupsRaw
+      .map((group) => ({
+        phone: group.phone,
+        _count: this.resolveGroupCount(group._count),
+      }))
+      .filter(
+        (group) => group._count > this.duplicatePhoneThreshold - 1,
       );
-      const ipGroups = ipGroupsRaw.filter(
-        (group) => (group._count ?? 0) > this.suspiciousIpThreshold - 1,
+    const ipGroups = ipGroupsRaw
+      .map((group) => ({
+        sourceIp: group.sourceIp,
+        _count: this.resolveGroupCount(group._count),
+      }))
+      .filter(
+        (group) => group._count > this.suspiciousIpThreshold - 1,
       );
-      const cardGroups = cardGroupsRaw.filter(
-        (group) => (group._count ?? 0) > this.sharedCardThreshold - 1,
+    const cardGroups = cardGroupsRaw
+      .map((group) => ({
+        cardNumber: group.cardNumber,
+        _count: this.resolveGroupCount(group._count),
+      }))
+      .filter(
+        (group) => group._count > this.sharedCardThreshold - 1,
       );
 
-      const duplicatePhones = await this.buildDuplicatePhoneDetails(
-        duplicatePhoneGroups,
+    const duplicatePhones = await this.buildDuplicatePhoneDetails(
+      duplicatePhoneGroups,
       lookbackDate,
     );
 
-    const suspiciousIps = await this.buildSuspiciousIpDetails(ipGroups, lookbackDate);
+    const suspiciousIps = await this.buildSuspiciousIpDetails(
+      ipGroups,
+      lookbackDate,
+    );
     const sharedCards = await this.buildSharedCardDetails(cardGroups);
 
     const fastCancelledLeads = cancelledLeads
@@ -397,5 +415,22 @@ export class FraudService {
     const result = new Date(value);
     result.setDate(result.getDate() - days);
     return result;
+  }
+
+  private resolveGroupCount(value: unknown): number {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (
+      value &&
+      typeof value === 'object' &&
+      '_all' in (value as Record<string, unknown>)
+    ) {
+      const all = (value as { _all?: unknown })._all;
+      if (typeof all === 'number') {
+        return all;
+      }
+    }
+    return 0;
   }
 }

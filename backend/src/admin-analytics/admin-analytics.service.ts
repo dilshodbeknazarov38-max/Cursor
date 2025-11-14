@@ -117,62 +117,64 @@ export class AdminAnalyticsService {
     const holdTotal = this.toNumber(balanceAggregate._sum?.holdBalance);
     const mainTotal = this.toNumber(balanceAggregate._sum?.mainBalance);
 
-    return {
-      range: {
-        days: rangeDays,
-        since: rangeStart,
-      },
-      metrics: {
-        users: {
-          total: totalUsers,
-          active: activeUsers,
-          newInRange: newUsersRange,
+      return {
+        range: {
+          days: rangeDays,
+          since: rangeStart,
         },
-        leads: totalLeads,
+        metrics: {
+          users: {
+            total: totalUsers,
+            active: activeUsers,
+            newInRange: newUsersRange,
+          },
+          leads: totalLeads,
           orders: deliveredOrdersAggregate._count ?? 0,
-        revenue: revenueTotal,
-        flows: flowsCount,
-        balances: {
-          hold: holdTotal,
-          main: mainTotal,
-          total: holdTotal + mainTotal,
-        },
-        payouts: {
+          revenue: revenueTotal,
+          flows: flowsCount,
+          balances: {
+            hold: holdTotal,
+            main: mainTotal,
+            total: holdTotal + mainTotal,
+          },
+          payouts: {
             pendingCount: pendingPayoutAggregate._count ?? 0,
             pendingAmount: this.toNumber(pendingPayoutAggregate._sum?.amount),
+          },
         },
-      },
-      topFlows: topFlows.map((flow) => ({
-        ...flow,
-        conversion: flow.clicks ? Number(((flow.orders / Math.max(flow.clicks, 1)) * 100).toFixed(2)) : 0,
-      })),
-      topTargetologs: targetologOrderGroups
-        .map((group) => {
-          const user = targetologUsers.find((candidate) => candidate.id === group.targetologId);
-          return {
-            id: group.targetologId,
-            name: user
-              ? `${user.firstName} (${user.nickname})`
-              : group.targetologId ?? 'Noma’lum targetolog',
-              orders: group._count ?? 0,
+        topFlows: topFlows.map((flow) => ({
+          ...flow,
+          conversion: flow.clicks ? Number(((flow.orders / Math.max(flow.clicks, 1)) * 100).toFixed(2)) : 0,
+        })),
+        topTargetologs: targetologOrderGroups
+          .map((group) => {
+            const user = targetologUsers.find((candidate) => candidate.id === group.targetologId);
+            const orderCount = typeof group._count === 'number' ? group._count : 0;
+            return {
+              id: group.targetologId,
+              name: user
+                ? `${user.firstName} (${user.nickname})`
+                : group.targetologId ?? 'Noma’lum targetolog',
+              orders: orderCount,
               revenue: this.toNumber(group._sum?.amount),
-          };
-        })
-        .sort((a, b) => b.orders - a.orders)
-        .slice(0, 5),
-      topOperators: operatorOrderGroups
-        .map((group) => {
-          const user = operatorUsers.find((candidate) => candidate.id === group.operatorId);
-          return {
-            id: group.operatorId,
-            name: user
-              ? `${user.firstName} (${user.nickname})`
-              : group.operatorId ?? 'Noma’lum operator',
-              handledOrders: group._count ?? 0,
-          };
-        })
-        .sort((a, b) => b.handledOrders - a.handledOrders)
-        .slice(0, 10),
+            };
+          })
+          .sort((a, b) => b.orders - a.orders)
+          .slice(0, 5),
+        topOperators: operatorOrderGroups
+          .map((group) => {
+            const user = operatorUsers.find((candidate) => candidate.id === group.operatorId);
+            const handled = typeof group._count === 'number' ? group._count : 0;
+            return {
+              id: group.operatorId,
+              name: user
+                ? `${user.firstName} (${user.nickname})`
+                : group.operatorId ?? 'Noma’lum operator',
+              handledOrders: handled,
+            };
+          })
+          .sort((a, b) => b.handledOrders - a.handledOrders)
+          .slice(0, 10),
     };
   }
 
@@ -238,33 +240,38 @@ export class AdminAnalyticsService {
         .map((payout) => ({ date: payout.createdAt, amount: this.toNumber(payout.amount) })),
     );
 
-    const operatorMap = new Map<
-      string,
-      {
-        id: string;
-        counts: Partial<Record<OrderStatus, number>>;
-      }
-    >();
+      const operatorMap = new Map<
+        string,
+        {
+          id: string;
+          counts: Partial<Record<OrderStatus, number>>;
+        }
+      >();
 
-    for (const group of operatorStatusGroups) {
-      const operatorId = group.operatorId ?? 'UNKNOWN';
+      for (const group of operatorStatusGroups) {
+        const operatorId = group.operatorId ?? 'UNKNOWN';
+        const groupCount =
+          typeof group._count === 'number' ? group._count : 0;
         const entry =
           operatorMap.get(operatorId) ??
           {
             id: operatorId,
             counts: {},
           };
-        entry.counts[group.status] = (entry.counts[group.status] ?? 0) + (group._count ?? 0);
-      operatorMap.set(operatorId, entry);
-    }
+        entry.counts[group.status] =
+          (entry.counts[group.status] ?? 0) + groupCount;
+        operatorMap.set(operatorId, entry);
+      }
 
-    const operatorIds = Array.from(operatorMap.keys()).filter((id) => id !== 'UNKNOWN');
-    const operatorUsers = operatorIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: operatorIds } },
-          select: { id: true, firstName: true, nickname: true },
-        })
-      : [];
+      const operatorIds = Array.from(operatorMap.keys()).filter(
+        (id) => id !== 'UNKNOWN',
+      );
+      const operatorUsers = operatorIds.length
+        ? await this.prisma.user.findMany({
+            where: { id: { in: operatorIds } },
+            select: { id: true, firstName: true, nickname: true },
+          })
+        : [];
 
     const operatorHeatmap = Array.from(operatorMap.values()).map((entry) => {
       const user = operatorUsers.find((candidate) => candidate.id === entry.id);

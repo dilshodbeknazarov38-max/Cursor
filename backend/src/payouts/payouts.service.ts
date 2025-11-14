@@ -51,14 +51,14 @@ export class PayoutsService {
       });
     });
 
-    await this.activityService.log({
-      userId: context.userId,
-      action: 'Yangi to‘lov so‘rovi yuborildi.',
-      meta: {
-        payoutId: payout.id,
-        amount: payout.amount,
-      },
-    });
+      await this.activityService.log({
+        userId: context.userId,
+        action: 'Yangi to‘lov so‘rovi yuborildi.',
+        meta: {
+          payoutId: payout.id,
+          amount: Number(payout.amount),
+        },
+      });
 
     await this.notifyAdmins(
       `Yangi to‘lov so‘rovi: ${payout.amount.toString()} so‘m`,

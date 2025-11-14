@@ -31,9 +31,36 @@ type OperatorContext = {
   role: string;
 };
 
-type LeadWithRelations = Awaited<
-  ReturnType<PrismaService['lead']['findUnique']>
->;
+const LEAD_RELATIONS = {
+  product: {
+    select: {
+      id: true,
+      title: true,
+      price: true,
+      cpaTargetolog: true,
+      cpaOperator: true,
+    },
+  },
+  flow: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+    },
+  },
+  operator: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      nickname: true,
+    },
+  },
+} as const;
+
+type LeadWithRelations = Prisma.LeadGetPayload<{
+  include: typeof LEAD_RELATIONS;
+}>;
 
 @Injectable()
 export class LeadsService {
@@ -84,22 +111,7 @@ export class LeadsService {
         sourceIp: context.ip ?? null,
         userAgent: context.userAgent ?? null,
       },
-      include: {
-        flow: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            price: true,
-          },
-        },
-      },
+      include: this.leadRelations(),
     });
 
     await this.prisma.flow.update({
@@ -432,32 +444,7 @@ export class LeadsService {
   }
 
   private leadRelations() {
-    return {
-      product: {
-        select: {
-          id: true,
-          title: true,
-          price: true,
-          cpaTargetolog: true,
-          cpaOperator: true,
-        },
-      },
-      flow: {
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-        },
-      },
-      operator: {
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          nickname: true,
-        },
-      },
-    } as const;
+    return LEAD_RELATIONS;
   }
 
   private mapLeadResponse(lead: LeadWithRelations) {

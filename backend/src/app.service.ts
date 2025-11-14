@@ -492,7 +492,7 @@ export class AppService implements OnModuleInit {
     });
   }
 
-  private async ensureDefaultAdmin(tx: PrismaService) {
+  private async ensureDefaultAdmin(tx: Prisma.TransactionClient) {
     const adminPhone = this.configService.get<string>('ADMIN_PHONE');
     const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
 

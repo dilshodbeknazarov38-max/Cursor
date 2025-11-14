@@ -6,7 +6,7 @@ import {
   PayoutStatus,
   TransactionType,
   UserStatus,
-  type Prisma,
+  Prisma,
 } from '@prisma/client';
 
 import { PrismaService } from '@/prisma/prisma.service';

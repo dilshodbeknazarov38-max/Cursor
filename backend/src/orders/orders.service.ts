@@ -61,30 +61,37 @@ export class OrdersService {
       throw new NotFoundException('Targetolog topilmadi.');
     }
 
-    let lead = null;
-    if (dto.leadId) {
-      lead = await this.prisma.lead.findFirst({
-        where: { id: dto.leadId },
-      });
-      if (!lead) {
-        throw new NotFoundException('Lead topilmadi.');
+      let lead: { id: string; targetologId: string } | null = null;
+      if (dto.leadId) {
+        lead = await this.prisma.lead.findFirst({
+          where: { id: dto.leadId },
+          select: {
+            id: true,
+            targetologId: true,
+          },
+        });
+        if (!lead) {
+          throw new NotFoundException('Lead topilmadi.');
+        }
+        if (lead.targetologId !== targetolog.id) {
+          throw new ForbiddenException(
+            'Lead ko‘rsatilgan targetologga tegishli emas.',
+          );
+        }
       }
-      if (lead.targetologId !== targetolog.id) {
-        throw new ForbiddenException(
-          'Lead ko‘rsatilgan targetologga tegishli emas.',
-        );
-      }
-    }
 
-    let operator = null;
-    if (dto.operatorId) {
-      operator = await this.prisma.user.findFirst({
-        where: { id: dto.operatorId, role: { slug: 'OPERATOR' } },
-      });
-      if (!operator) {
-        throw new NotFoundException('Operator topilmadi.');
+      let operator: { id: string } | null = null;
+      if (dto.operatorId) {
+        operator = await this.prisma.user.findFirst({
+          where: { id: dto.operatorId, role: { slug: 'OPERATOR' } },
+          select: {
+            id: true,
+          },
+        });
+        if (!operator) {
+          throw new NotFoundException('Operator topilmadi.');
+        }
       }
-    }
 
     const order = await this.prisma.order.create({
       data: {
